@@ -1,34 +1,38 @@
+# ========== IDE & OS ==========
 .DS_Store
-__pycache__/
-*.py[cod]
-*.pytest_cache/
+.idea/
+*.iml
+.settings/
+.classpath
+.project
 
-backend/.env
-backend/.venv/
-backend/.venv-*/
-backend/*.egg-info/
-backend/data/*.db*
-backend/data/*.index
-backend/data/*.faiss
-backend/data/*.pkl
-backend/data/llama_index_storage/
-backend/data/uploads/
+# ========== Spring Boot 后端 ==========
+backend-spring/target/
+backend-spring/*.jar
+*.class
 
-frontend/node_modules/
-frontend/dist/
+# ========== Node 前端 ==========
+frontend-hhu/node_modules/
+frontend-hhu/dist/
 
-# 本地构建产物与备份
+# ========== 本地临时文件 ==========
+local/
 output/
 .playwright-mcp/
 site-snapshot-full/
 *.png
 !docs/screenshots/*.png
 
-# Demo 向量库 release asset 与临时文件
+# ========== 旧的 Demo 文件（已删除，不上传） ==========
+backend/
+frontend/
+demo-rag/
+
+# ========== Demo 向量库 ==========
 campus-qa-demo-index-*.tar.gz
 .tmp-demo-index.tar.gz
 
-# 全量知识库不上传，仅保留 knowledge-base/demo/ 用于演示
+# ========== 知识库（仅保留 demo） ==========
 knowledge-base/*/
 !knowledge-base/demo/
 !knowledge-base/README.md
