@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Table, Tag, Button, message, Upload, Popconfirm } from 'antd'
-import { UploadOutlined } from '@ant-design/icons'
-import { docApi } from '../api'
+import { UploadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { docApi, adminApi } from '../api'
 
 export default function DocumentManage() {
   const [data, setData] = useState<any[]>([])
@@ -9,6 +9,7 @@ export default function DocumentManage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [rebuilding, setRebuilding] = useState(false)
 
   const load = async (p = 1) => {
     setLoading(true)
@@ -27,6 +28,14 @@ export default function DocumentManage() {
   useEffect(() => {
     load()
   }, [])
+
+  // 有 PROCESSING 状态的文档时，每 2 秒自动刷新
+  useEffect(() => {
+    const hasProcessing = data.some((d) => d.status === 'PROCESSING')
+    if (!hasProcessing) return
+    const timer = setInterval(() => load(page), 2000)
+    return () => clearInterval(timer)
+  }, [data, page])
 
   const handleUpload = async (info: any) => {
     const file = info.file as File
@@ -49,6 +58,19 @@ export default function DocumentManage() {
       load(page)
     } catch {
       message.error('删除失败')
+    }
+  }
+
+  const handleRebuild = async () => {
+    setRebuilding(true)
+    try {
+      await adminApi.rebuildIndex()
+      message.success('索引重建完成')
+      load(page)
+    } catch {
+      message.error('索引重建失败')
+    } finally {
+      setRebuilding(false)
     }
   }
 
@@ -101,6 +123,14 @@ export default function DocumentManage() {
             上传文档
           </Button>
         </Upload>
+        <Button
+          icon={<ReloadOutlined />}
+          loading={rebuilding}
+          onClick={handleRebuild}
+          style={{ marginLeft: 8 }}
+        >
+          重建索引
+        </Button>
         <span style={{ marginLeft: 12, color: '#999', fontSize: 12 }}>
           支持 PDF / DOCX / TXT / MD，最大 10MB
         </span>

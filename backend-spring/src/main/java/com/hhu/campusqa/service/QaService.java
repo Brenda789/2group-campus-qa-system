@@ -1,7 +1,10 @@
 package com.hhu.campusqa.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.entity.Conversation;
 import com.hhu.campusqa.entity.Message;
@@ -25,10 +28,16 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
+    private final RagService ragService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public QaService(QaRecordMapper mapper, ConversationMapper conversationMapper, MessageMapper messageMapper) {
+    public QaService(QaRecordMapper mapper,
+                     ConversationMapper conversationMapper,
+                     MessageMapper messageMapper,
+                     RagService ragService) {
         this.conversationMapper = conversationMapper;
         this.messageMapper = messageMapper;
+        this.ragService = ragService;
     }
 
     // ==================== QaRecord（汇总） ====================
@@ -41,18 +50,37 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .list();
     }
 
+    /** 管理端：分页查询所有用户问答记录 */
+    public Page<QaRecord> pageAllQaRecords(int page, int size) {
+        return this.page(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<QaRecord>()
+                        .orderByDesc(QaRecord::getCreateTime)
+        );
+    }
+
     /**
-     * 问答处理（当前为占位实现，后续 Day3 RAG 接入后重写）
+     * 问答处理 — 调用 RAG 引擎，返回基于知识库的答案
      */
     @Transactional
     public QaRecord ask(Long userId, String question, Long conversationId) {
-        // 1. 保存到 qa_record（汇总表）
+        // 1. 调用 RAG 引擎获取答案
+        AnswerService.AnswerResult ragResult = ragService.answer(question);
+        String answer = ragResult.answer();
+        String sourceDocs;
+        try {
+            sourceDocs = objectMapper.writeValueAsString(ragResult.sources());
+        } catch (JsonProcessingException e) {
+            sourceDocs = "[]";
+        }
+
+        // 2. 保存到 qa_record（汇总表）
         QaRecord record = QaRecord.builder()
                 .userId(userId)
                 .conversationId(conversationId)
                 .question(question)
-                .answer("（RAG 引擎接入中，后续版本将返回智能回答）")
-                .sourceDocs("[]")
+                .answer(answer)
+                .sourceDocs(sourceDocs)
                 .build();
         save(record);
 
@@ -79,7 +107,7 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .conversationId(conversationId)
                 .role("assistant")
                 .content(record.getAnswer())
-                .sources("[]")
+                .sources(sourceDocs)
                 .build();
         messageMapper.insert(aiMsg);
 

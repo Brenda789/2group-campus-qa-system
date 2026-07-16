@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Card, Col, Row, Statistic } from 'antd'
 import { CommentOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons'
-import { chatApi } from '../api'
+import { adminApi } from '../api'
 
 export default function Dashboard() {
-  const [qaCount, setQaCount] = useState(0)
+  const [stats, setStats] = useState({ docCount: 0, userCount: 0, qaCount: 0 })
 
   useEffect(() => {
-    chatApi.history().then((res: any) => {
-      if (Array.isArray(res)) setQaCount(res.length)
+    adminApi.stats().then((res: any) => {
+      setStats(res)
     }).catch(() => {})
   }, [])
 
@@ -20,7 +20,7 @@ export default function Dashboard() {
           <Card>
             <Statistic
               title="问答总数"
-              value={qaCount}
+              value={stats.qaCount}
               prefix={<CommentOutlined />}
             />
           </Card>
@@ -29,7 +29,7 @@ export default function Dashboard() {
           <Card>
             <Statistic
               title="知识库文档"
-              value={0}
+              value={stats.docCount}
               prefix={<FileTextOutlined />}
               suffix="篇"
             />
@@ -39,7 +39,7 @@ export default function Dashboard() {
           <Card>
             <Statistic
               title="注册用户"
-              value={0}
+              value={stats.userCount}
               prefix={<UserOutlined />}
               suffix="人"
             />

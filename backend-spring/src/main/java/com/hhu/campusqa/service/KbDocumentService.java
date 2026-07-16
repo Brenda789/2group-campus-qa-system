@@ -8,12 +8,12 @@ import com.hhu.campusqa.entity.KbDocument;
 import com.hhu.campusqa.mapper.KbDocumentMapper;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 知识库文档服务
@@ -23,6 +23,12 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
 
     /** 文件上传目录（与 application.properties 中 file.upload-dir 对应） */
     private static final String UPLOAD_DIR = "./uploads";
+
+    private final RagService ragService;
+
+    public KbDocumentService(RagService ragService) {
+        this.ragService = ragService;
+    }
 
     /** 分页查询文档列表 */
     public Page<KbDocument> pageDocuments(int page, int size) {
@@ -65,10 +71,14 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
                 .uploadedBy(uploadedBy)
                 .build();
         save(doc);
+
+        // 5. 异步触发 RAG 处理管线：解析 → 切片 → Embedding → 入库
+        CompletableFuture.runAsync(() -> ragService.addDocument(doc));
+
         return doc;
     }
 
-    /** 删除文档（同时删除物理文件） */
+    /** 删除文档（同时删除物理文件，并异步重建向量索引） */
     public void deleteDocument(Long id) {
         KbDocument doc = getById(id);
         if (doc == null) {
@@ -82,6 +92,9 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         }
         // 删除数据库记录
         removeById(id);
+
+        // 异步重建向量索引（全量重跑，确保一致性）
+        CompletableFuture.runAsync(() -> ragService.rebuildIndex());
     }
 
     /** 更新文档处理状态 */

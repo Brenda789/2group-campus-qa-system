@@ -7,6 +7,7 @@ import AdminPage from './pages/AdminPage'
 import Dashboard from './pages/Dashboard'
 import UserList from './pages/UserList'
 import DocumentManage from './pages/DocumentManage'
+import ChatHistory from './pages/ChatHistory'
 
 /** 河海大学主题色 */
 const hhuTheme = {
@@ -31,8 +32,7 @@ export default function App() {
               <Route index element={<Dashboard />} />
               <Route path="users" element={<UserList />} />
               <Route path="documents" element={<DocumentManage />} />
-              {/* chat 占位，后续可替换 */}
-              <Route path="chat" element={<Dashboard />} />
+              <Route path="chat" element={<ChatHistory />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

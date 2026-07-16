@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Button, Dropdown, Avatar } from 'antd'
 import {
   DashboardOutlined,
+  HomeOutlined,
   UserOutlined,
   FileTextOutlined,
   LogoutOutlined,
@@ -93,6 +94,9 @@ export default function AdminLayout() {
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
           />
+          <Button type="text" icon={<HomeOutlined />} onClick={() => navigate('/')}>
+            返回首页
+          </Button>
           <Dropdown
             menu={{
               items: [
