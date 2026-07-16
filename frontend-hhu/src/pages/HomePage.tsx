@@ -1,13 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button, Input, Card, message, Space, Tag } from 'antd'
-import {
-  RobotOutlined,
-  SendOutlined,
-  CloseOutlined,
-  HistoryOutlined,
-  DeleteOutlined,
-  QuestionCircleOutlined,
-} from '@ant-design/icons'
+import { RobotOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons'
 import { chatApi } from '../api'
 
 interface Message {
@@ -133,7 +126,7 @@ export default function HomePage() {
             display: 'flex',
             flexDirection: 'column',
           }}
-          bodyStyle={{ flex: 1, overflow: 'auto', padding: 12 }}
+          styles={{ body: { flex: 1, overflow: 'auto', padding: 12 } }}
         >
           {/* 消息列表 */}
           <div style={{ flex: 1, overflow: 'auto', minHeight: 320, marginBottom: 8 }}>
