@@ -1,47 +1,72 @@
-import axios from 'axios'
+import request from './services/request'
 
-const api = axios.create({ baseURL: '/api' })
-
-/** 请求拦截：自动带 token */
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-
-/** 响应拦截：401 时回登录页 */
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      if (!window.location.hash.includes('login')) {
-        window.location.href = '/#/login'
-      }
-    }
-    return Promise.reject(err)
-  }
-)
-
-/** ---------- 认证 ---------- */
+// ==================== 认证 ====================
 export const authApi = {
+  /** 登录 → { token, username, role } */
   login: (username: string, password: string) =>
-    api.post('/auth/login', { username, password }),
+    request.post('/auth/login', { username, password }),
+
+  /** 注册 → 返回新用户 ID */
   register: (username: string, password: string, email: string) =>
-    api.post('/auth/register', { username, password, email }),
+    request.post('/auth/register', { username, password, email }),
 }
 
-/** ---------- 问答 ---------- */
+// ==================== 用户管理 ====================
+export const userApi = {
+  /** 分页列表 → { records, total, current, size } */
+  list: (page = 1, size = 10, keyword?: string) =>
+    request.get('/user/list', { params: { page, size, keyword } }),
+
+  /** 启停用户 */
+  toggleStatus: (userId: number, status: number) =>
+    request.put(`/user/${userId}/status`, { status }),
+
+  /** 删除用户（软删除） */
+  remove: (userId: number) =>
+    request.delete(`/user/${userId}`),
+
+  /** 当前用户信息 */
+  me: () => request.get('/user/me'),
+}
+
+// ==================== 问答 ====================
 export const chatApi = {
-  ask: (question: string) => api.post('/chat/ask', { question }),
-  history: () => api.get('/chat/history'),
+  /** 提问 → QaRecord */
+  ask: (question: string, conversationId?: number) =>
+    request.post('/chat/ask', { question, conversationId }),
+
+  /** 问答历史 → QaRecord[] */
+  history: () => request.get('/chat/history'),
+
+  /** 会话列表 → Conversation[] */
+  conversations: () => request.get('/chat/conversations'),
+
+  /** 会话消息 → Message[] */
+  messages: (convId: number) =>
+    request.get(`/chat/conversations/${convId}/messages`),
+
+  /** 删除会话 */
+  deleteConversation: (convId: number) =>
+    request.delete(`/chat/conversations/${convId}`),
 }
 
-/** ---------- 文档 ---------- */
+// ==================== 文档管理 ====================
 export const docApi = {
-  list: () => api.get('/documents'),
-  delete: (id: number) => api.delete(`/documents/${id}`),
+  /** 分页列表 → { records, total, current, size } */
+  list: (page = 1, size = 10) =>
+    request.get('/documents', { params: { page, size } }),
+
+  /** 上传文档 → FormData */
+  upload: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post('/documents', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  /** 删除文档 */
+  remove: (id: number) => request.delete(`/documents/${id}`),
 }
 
-export default api
+export default request

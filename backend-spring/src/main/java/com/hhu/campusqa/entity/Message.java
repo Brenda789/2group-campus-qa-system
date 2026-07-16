@@ -9,30 +9,32 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * sys_user 用户表实体
+ * message 消息表实体
+ * <p>
+ * 每条消息属于一个会话，role 区分用户/AI
+ * </p>
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user")
-public class SysUser {
+@TableName("message")
+public class Message {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String username;
+    /** 所属会话 ID */
+    private Long conversationId;
 
-    /** BCrypt 加密后的密码 */
-    private String password;
-
-    private String email;
-
-    /** 角色：admin / user */
+    /** 消息角色：user / assistant */
     private String role;
 
-    /** 状态：1 启用 / 0 禁用 */
-    private Integer status;
+    /** 消息内容 */
+    private String content;
+
+    /** 来源文档（仅 assistant 消息，JSON 数组字符串，可为 null） */
+    private String sources;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

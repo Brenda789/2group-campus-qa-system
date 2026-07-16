@@ -9,31 +9,30 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * sys_user 用户表实体
+ * conversation 会话表实体
+ * <p>
+ * 一个会话包含多条消息（一对多关联 message 表）
+ * </p>
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user")
-public class SysUser {
+@TableName("conversation")
+public class Conversation {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String username;
+    /** 所属用户 ID */
+    private Long userId;
 
-    /** BCrypt 加密后的密码 */
-    private String password;
-
-    private String email;
-
-    /** 角色：admin / user */
-    private String role;
-
-    /** 状态：1 启用 / 0 禁用 */
-    private Integer status;
+    /** 会话标题（自动取首条问题截断） */
+    private String title;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime updateTime;
 }

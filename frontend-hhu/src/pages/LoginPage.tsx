@@ -4,6 +4,12 @@ import { Card, Form, Input, Button, message, Tabs } from 'antd'
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { authApi } from '../api'
 
+/**
+ * 登录 / 注册页面
+ *
+ * 注意：request 拦截器已自动提取 data 层，
+ * 所以 api 调用的返回值直接是业务数据（如 { token, username, role }），无需 .data
+ */
 export default function LoginPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -11,13 +17,15 @@ export default function LoginPage() {
   const onLogin = async (values: { username: string; password: string }) => {
     setLoading(true)
     try {
-      const res = await authApi.login(values.username, values.password)
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify(res.data.user))
+      const data: any = await authApi.login(values.username, values.password)
+      // 响应拦截器已取 data 层，直接拿 { token, username, role }
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify({ username: data.username }))
+      localStorage.setItem('role', data.role)
       message.success('登录成功')
       navigate('/admin')
-    } catch {
-      message.error('用户名或密码错误')
+    } catch (e: any) {
+      message.error(e?.message || '用户名或密码错误')
     } finally {
       setLoading(false)
     }
@@ -30,13 +38,16 @@ export default function LoginPage() {
   }) => {
     setLoading(true)
     try {
-      const res = await authApi.register(values.username, values.password, values.email)
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify(res.data.user))
+      await authApi.register(values.username, values.password, values.email)
+      // 注册成功后自动登录
+      const data: any = await authApi.login(values.username, values.password)
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify({ username: data.username }))
+      localStorage.setItem('role', data.role)
       message.success('注册成功')
       navigate('/admin')
-    } catch {
-      message.error('注册失败，用户名可能已存在')
+    } catch (e: any) {
+      message.error(e?.message || '注册失败，用户名可能已存在')
     } finally {
       setLoading(false)
     }
@@ -62,10 +73,16 @@ export default function LoginPage() {
               label: '登录',
               children: (
                 <Form onFinish={onLogin} size="large">
-                  <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
+                  <Form.Item
+                    name="username"
+                    rules={[{ required: true, message: '请输入用户名' }]}
+                  >
                     <Input prefix={<UserOutlined />} placeholder="用户名" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+                  <Form.Item
+                    name="password"
+                    rules={[{ required: true, message: '请输入密码' }]}
+                  >
                     <Input.Password prefix={<LockOutlined />} placeholder="密码" />
                   </Form.Item>
                   <Form.Item>
@@ -81,13 +98,19 @@ export default function LoginPage() {
               label: '注册',
               children: (
                 <Form onFinish={onRegister} size="large">
-                  <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
+                  <Form.Item
+                    name="username"
+                    rules={[{ required: true, message: '请输入用户名' }]}
+                  >
                     <Input prefix={<UserOutlined />} placeholder="用户名" />
                   </Form.Item>
                   <Form.Item name="email">
                     <Input prefix={<MailOutlined />} placeholder="邮箱（选填）" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, min: 6, message: '密码至少6位' }]}>
+                  <Form.Item
+                    name="password"
+                    rules={[{ required: true, min: 6, message: '密码至少6位' }]}
+                  >
                     <Input.Password prefix={<LockOutlined />} placeholder="密码" />
                   </Form.Item>
                   <Form.Item>

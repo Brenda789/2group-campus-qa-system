@@ -1,36 +1,66 @@
 package com.hhu.campusqa.controller;
 
+import com.hhu.campusqa.common.Result;
 import com.hhu.campusqa.dto.ChatRequest;
+import com.hhu.campusqa.entity.Conversation;
+import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** 问答接口 */
+/**
+ * 问答接口
+ */
 @RestController
 @RequestMapping("/api/chat")
-@RequiredArgsConstructor
 public class ChatController {
 
     private final QaService qaService;
 
-    /** 提问 */
-    @PostMapping("/ask")
-    public ResponseEntity<QaRecord> ask(@Valid @RequestBody ChatRequest req,
-                                        HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
-        return ResponseEntity.ok(qaService.ask(userId, req));
+    public ChatController(QaService qaService) {
+        this.qaService = qaService;
     }
 
-    /** 问答历史 */
-    @GetMapping("/history")
-    public ResponseEntity<List<QaRecord>> history(HttpServletRequest request) {
+    /** 提问（当前为占位实现） */
+    @PostMapping("/ask")
+    public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
+                                 HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        return ResponseEntity.ok(qaService.getHistory(userId));
+        return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
+    }
+
+    /** 问答历史（qa_record 汇总） */
+    @GetMapping("/history")
+    public Result<List<QaRecord>> history(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.success(qaService.getHistory(userId));
+    }
+
+    // ==================== 会话（conversation） ====================
+
+    /** 我的会话列表 */
+    @GetMapping("/conversations")
+    public Result<List<Conversation>> conversations(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.success(qaService.getConversations(userId));
+    }
+
+    /** 某会话的消息列表 */
+    @GetMapping("/conversations/{id}/messages")
+    public Result<List<Message>> messages(@PathVariable Long id) {
+        return Result.success(qaService.getMessages(id));
+    }
+
+    /** 删除会话 */
+    @DeleteMapping("/conversations/{id}")
+    public Result<Void> deleteConversation(@PathVariable Long id,
+                                            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        qaService.deleteConversation(id, userId);
+        return Result.success();
     }
 }

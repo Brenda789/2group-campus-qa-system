@@ -1,12 +1,12 @@
 package com.hhu.campusqa.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.hhu.campusqa.entity.KbDocument;
+import com.hhu.campusqa.entity.Message;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * kb_document 表 Mapper
+ * message 表 Mapper
  */
 @Mapper
-public interface KbDocumentMapper extends BaseMapper<KbDocument> {
+public interface MessageMapper extends BaseMapper<Message> {
 }

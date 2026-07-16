@@ -1,20 +1,44 @@
 package com.hhu.campusqa.entity;
 
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** kb_document 知识库文档表实体 */
+import java.time.LocalDateTime;
+
+/**
+ * kb_document 知识库文档表实体
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@TableName("kb_document")
 public class KbDocument {
+
+    @TableId(type = IdType.AUTO)
     private Long id;
+
+    /** 文档标题 */
     private String title;
+
+    /** 文件存储路径 */
     private String filePath;
-    private String fileType;     // pdf / docx / txt / md
+
+    /** 文件类型：pdf / docx / txt / md */
+    private String fileType;
+
+    /** 文本切块数量 */
     private Integer chunkCount;
-    private String status;       // PROCESSING / READY / ERROR
+
+    /** 处理状态：PROCESSING / READY / ERROR */
+    private String status;
+
+    /** 上传者 ID */
+    private Long uploadedBy;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
 }

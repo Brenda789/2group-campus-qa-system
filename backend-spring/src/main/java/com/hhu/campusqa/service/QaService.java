@@ -1,36 +1,122 @@
 package com.hhu.campusqa.service;
 
-import com.hhu.campusqa.dto.ChatRequest;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hhu.campusqa.common.BizException;
+import com.hhu.campusqa.entity.Conversation;
+import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
+import com.hhu.campusqa.mapper.ConversationMapper;
+import com.hhu.campusqa.mapper.MessageMapper;
 import com.hhu.campusqa.mapper.QaRecordMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/** 问答服务 */
+/**
+ * 问答服务
+ * <p>
+ * 同时维护 qa_record（汇总记录）和 conversation + message（详情）两套表。
+ * </p>
+ */
 @Service
-@RequiredArgsConstructor
-public class QaService {
+public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
-    private final QaRecordMapper qaRecordMapper;
+    private final ConversationMapper conversationMapper;
+    private final MessageMapper messageMapper;
 
-    /** 查询用户的问答历史 */
+    public QaService(QaRecordMapper mapper, ConversationMapper conversationMapper, MessageMapper messageMapper) {
+        this.conversationMapper = conversationMapper;
+        this.messageMapper = messageMapper;
+    }
+
+    // ==================== QaRecord（汇总） ====================
+
+    /** 查询某用户的问答历史 */
     public List<QaRecord> getHistory(Long userId) {
-        return qaRecordMapper.findByUserId(userId);
+        return lambdaQuery()
+                .eq(QaRecord::getUserId, userId)
+                .orderByDesc(QaRecord::getCreateTime)
+                .list();
     }
 
     /**
-     * 问答处理（Day 1 先返回占位，后续 Day 3/4 接入 RAG）
+     * 问答处理（当前为占位实现，后续 Day3 RAG 接入后重写）
      */
-    public QaRecord ask(Long userId, ChatRequest req) {
+    @Transactional
+    public QaRecord ask(Long userId, String question, Long conversationId) {
+        // 1. 保存到 qa_record（汇总表）
         QaRecord record = QaRecord.builder()
                 .userId(userId)
-                .question(req.getQuestion())
+                .conversationId(conversationId)
+                .question(question)
                 .answer("（RAG 引擎接入中，后续版本将返回智能回答）")
                 .sourceDocs("[]")
                 .build();
-        qaRecordMapper.insert(record);
+        save(record);
+
+        // 2. 如果没有传入 conversationId，自动创建新会话
+        if (conversationId == null) {
+            Conversation conv = Conversation.builder()
+                    .userId(userId)
+                    .title(question.length() > 30 ? question.substring(0, 30) + "..." : question)
+                    .build();
+            conversationMapper.insert(conv);
+            conversationId = conv.getId();
+        }
+
+        // 3. 保存用户消息
+        Message userMsg = Message.builder()
+                .conversationId(conversationId)
+                .role("user")
+                .content(question)
+                .build();
+        messageMapper.insert(userMsg);
+
+        // 4. 保存 AI 回复
+        Message aiMsg = Message.builder()
+                .conversationId(conversationId)
+                .role("assistant")
+                .content(record.getAnswer())
+                .sources("[]")
+                .build();
+        messageMapper.insert(aiMsg);
+
         return record;
+    }
+
+    // ==================== Conversation（会话） ====================
+
+    /** 查询某用户的会话列表 */
+    public List<Conversation> getConversations(Long userId) {
+        return conversationMapper.selectList(
+                new LambdaQueryWrapper<Conversation>()
+                        .eq(Conversation::getUserId, userId)
+                        .orderByDesc(Conversation::getUpdateTime)
+        );
+    }
+
+    /** 删除会话及其所有消息 */
+    @Transactional
+    public void deleteConversation(Long conversationId, Long userId) {
+        Conversation conv = conversationMapper.selectById(conversationId);
+        if (conv == null || !conv.getUserId().equals(userId)) {
+            throw new BizException(403, "无权操作该会话");
+        }
+        // 删除消息
+        messageMapper.delete(new LambdaQueryWrapper<Message>()
+                .eq(Message::getConversationId, conversationId));
+        // 删除会话
+        conversationMapper.deleteById(conversationId);
+    }
+
+    /** 查询某会话的所有消息 */
+    public List<Message> getMessages(Long conversationId) {
+        return messageMapper.selectList(
+                new LambdaQueryWrapper<Message>()
+                        .eq(Message::getConversationId, conversationId)
+                        .orderByAsc(Message::getCreateTime)
+        );
     }
 }

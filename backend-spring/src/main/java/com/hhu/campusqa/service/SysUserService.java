@@ -1,82 +1,101 @@
 package com.hhu.campusqa.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.dto.LoginRequest;
 import com.hhu.campusqa.dto.RegisterRequest;
 import com.hhu.campusqa.entity.SysUser;
 import com.hhu.campusqa.mapper.SysUserMapper;
 import com.hhu.campusqa.util.JwtUtil;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-/** 用户服务 */
+/**
+ * 用户服务（继承 MyBatis-Plus ServiceImpl）
+ * <p>
+ * 自动拥有：save / remove / update / list / page 等 CRUD 方法
+ * </p>
+ */
 @Service
-@RequiredArgsConstructor
-public class SysUserService {
+public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
 
-    private final SysUserMapper sysUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    /** 注册 */
-    public Map<String, Object> register(RegisterRequest req) {
-        if (sysUserMapper.findByUsername(req.getUsername()) != null) {
-            throw new RuntimeException("用户名已存在");
-        }
-        SysUser user = SysUser.builder()
-                .username(req.getUsername())
-                .password(passwordEncoder.encode(req.getPassword()))
-                .email(req.getEmail())
-                .role("user")
-                .status(1)
-                .build();
-        sysUserMapper.insert(user);
-
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("user", toUserMap(user));
-        return result;
+    public SysUserService(SysUserMapper mapper, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
-    /** 登录 */
-    public Map<String, Object> login(LoginRequest req) {
-        SysUser user = sysUserMapper.findByUsername(req.getUsername());
-        if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+    // ==================== 注册 ====================
+
+    /** 注册新用户 */
+    public Long register(RegisterRequest dto) {
+        // 检查用户名是否已存在
+        Long exist = lambdaQuery()
+                .eq(SysUser::getUsername, dto.getUsername())
+                .count();
+        if (exist > 0) {
+            throw new BizException(400, "用户名已存在");
+        }
+
+        SysUser user = new SysUser();
+        BeanUtils.copyProperties(dto, user);
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setRole("user");
+        user.setStatus(1);
+        save(user);  // MyBatis-Plus 自动填充 createTime
+        return user.getId();
+    }
+
+    // ==================== 登录 ====================
+
+    /** 登录校验，返回 token + 用户信息 */
+    public Map<String, Object> login(LoginRequest dto) {
+        SysUser user = lambdaQuery()
+                .eq(SysUser::getUsername, dto.getUsername())
+                .one();
+        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BizException(401, "用户名或密码错误");
         }
         if (user.getStatus() == 0) {
-            throw new RuntimeException("账号已停用");
+            throw new BizException(403, "账号已停用，请联系管理员");
         }
+
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
-        result.put("user", toUserMap(user));
+        result.put("username", user.getUsername());
+        result.put("role", user.getRole());
         return result;
     }
 
-    /** 管理员：用户列表 */
-    public List<SysUser> listUsers() {
-        return sysUserMapper.findAll();
+    // ==================== 管理 ====================
+
+    /** 分页查询用户列表（支持关键词搜索） */
+    public Page<SysUser> pageUsers(int page, int size, String keyword) {
+        LambdaQueryWrapper<SysUser> qw = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            qw.like(SysUser::getUsername, keyword);
+        }
+        qw.orderByDesc(SysUser::getCreateTime);
+        return this.page(new Page<>(page, size), qw);
     }
 
-    /** 管理员：启停用户 */
-    public void toggleUser(Long id, Integer status) {
-        sysUserMapper.updateStatus(id, status);
-    }
-
-    private Map<String, Object> toUserMap(SysUser user) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", user.getId());
-        map.put("username", user.getUsername());
-        map.put("email", user.getEmail());
-        map.put("role", user.getRole());
-        map.put("status", user.getStatus());
-        map.put("createTime", user.getCreateTime());
-        return map;
+    /** 启停用户 */
+    public void toggleUserStatus(Long id, Integer status) {
+        SysUser user = getById(id);
+        if (user == null) {
+            throw new BizException(400, "用户不存在");
+        }
+        user.setStatus(status);
+        updateById(user);
     }
 }

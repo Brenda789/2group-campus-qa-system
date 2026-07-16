@@ -1,26 +1,16 @@
 package com.hhu.campusqa.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.hhu.campusqa.entity.SysUser;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Mapper;
 
-/** sys_user 表 MyBatis Mapper */
+/**
+ * sys_user 表 Mapper（继承 MyBatis-Plus BaseMapper）
+ * <p>
+ * 继承后自动拥有：insert / deleteById / updateById / selectById / selectList 等
+ * 无需手写 SQL。
+ * </p>
+ */
 @Mapper
-public interface SysUserMapper {
-
-    @Select("SELECT * FROM sys_user WHERE username = #{username}")
-    SysUser findByUsername(String username);
-
-    @Select("SELECT * FROM sys_user WHERE id = #{id}")
-    SysUser findById(Long id);
-
-    @Insert("INSERT INTO sys_user(username, password, email, role, status) " +
-            "VALUES(#{username}, #{password}, #{email}, #{role}, #{status})")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insert(SysUser user);
-
-    @Select("SELECT * FROM sys_user ORDER BY create_time DESC")
-    java.util.List<SysUser> findAll();
-
-    @Update("UPDATE sys_user SET status = #{status} WHERE id = #{id}")
-    int updateStatus(@Param("id") Long id, @Param("status") Integer status);
+public interface SysUserMapper extends BaseMapper<SysUser> {
 }

@@ -4,6 +4,9 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
+import Dashboard from './pages/Dashboard'
+import UserList from './pages/UserList'
+import DocumentManage from './pages/DocumentManage'
 
 /** 河海大学主题色 */
 const hhuTheme = {
@@ -22,7 +25,16 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin/*" element={<AdminPage />} />
+
+            {/* 管理后台 — AdminPage 是父路由壳，子页面由 AdminLayout 的 <Outlet /> 渲染 */}
+            <Route path="/admin" element={<AdminPage />}>
+              <Route index element={<Dashboard />} />
+              <Route path="users" element={<UserList />} />
+              <Route path="documents" element={<DocumentManage />} />
+              {/* chat 占位，后续可替换 */}
+              <Route path="chat" element={<Dashboard />} />
+            </Route>
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </HashRouter>
