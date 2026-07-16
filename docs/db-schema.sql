@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS qa_record (
     question        TEXT          NOT NULL            COMMENT '用户问题',
     answer          LONGTEXT      NOT NULL            COMMENT 'AI 答案',
     source_docs     VARCHAR(2000) DEFAULT '[]'        COMMENT '来源文档 JSON 数组',
+    feedback        TINYINT       DEFAULT 0              COMMENT '评价：1=赞 / -1=踩 / 0=无',
     create_time     DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_qa_user (user_id),
     INDEX idx_qa_conv (conversation_id)
@@ -94,3 +95,4 @@ VALUES ('admin',
 -- ALTER TABLE kb_document ADD COLUMN IF NOT EXISTS create_time DATETIME DEFAULT CURRENT_TIMESTAMP AFTER uploaded_by;
 -- ALTER TABLE qa_record ADD COLUMN IF NOT EXISTS conversation_id BIGINT AFTER user_id;
 -- ALTER TABLE qa_record MODIFY COLUMN source_docs VARCHAR(2000);
+-- ALTER TABLE qa_record ADD COLUMN IF NOT EXISTS feedback TINYINT DEFAULT 0 COMMENT '评价：1=赞 / -1=踩 / 0=无' AFTER source_docs;

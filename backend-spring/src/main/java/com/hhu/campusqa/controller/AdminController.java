@@ -11,10 +11,14 @@ import com.hhu.campusqa.service.SysUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 管理后台专用接口（统计、全量问答记录）
+ * 管理后台专用接口（统计、全量问答记录、索引重建）
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -37,13 +41,24 @@ public class AdminController {
 
     /** 仪表盘统计数据 */
     @GetMapping("/stats")
-    public Result<Map<String, Long>> stats(HttpServletRequest request) {
+    public Result<Map<String, Object>> stats(HttpServletRequest request) {
         checkAdmin(request);
-        return Result.success(Map.of(
-                "docCount", kbDocumentService.count(),
-                "userCount", sysUserService.count(),
-                "qaCount", qaService.count()
-        ));
+
+        long userCount = sysUserService.count();
+        long documentCount = kbDocumentService.count();
+        long qaCount = qaService.count();
+
+        LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        long todayQaCount = qaService.lambdaQuery()
+                .ge(QaRecord::getCreateTime, todayStart)
+                .count();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("userCount", userCount);
+        data.put("documentCount", documentCount);
+        data.put("qaCount", qaCount);
+        data.put("todayQaCount", todayQaCount);
+        return Result.success(data);
     }
 
     /** 全量问答记录（分页） */

@@ -8,7 +8,7 @@ import axios from 'axios'
  * - 响应拦截：提取 data 层，统一处理 code !== 200 和 401
  */
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:8000/api',
   timeout: 10000,
 })
 

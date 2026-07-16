@@ -7,11 +7,13 @@ import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.entity.KbDocument;
 import com.hhu.campusqa.mapper.KbDocumentMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,6 +37,17 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         LambdaQueryWrapper<KbDocument> qw = new LambdaQueryWrapper<>();
         qw.orderByDesc(KbDocument::getCreateTime);
         return this.page(new Page<>(page, size), qw);
+    }
+
+    /** 按标题关键字搜索已就绪的文档（所有用户可用） */
+    public List<KbDocument> searchDocuments(String keyword) {
+        LambdaQueryWrapper<KbDocument> qw = new LambdaQueryWrapper<>();
+        qw.eq(KbDocument::getStatus, "READY");
+        if (StringUtils.hasText(keyword)) {
+            qw.like(KbDocument::getTitle, keyword);
+        }
+        qw.orderByDesc(KbDocument::getCreateTime);
+        return list(qw);
     }
 
     /**

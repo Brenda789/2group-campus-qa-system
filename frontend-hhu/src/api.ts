@@ -2,6 +2,9 @@ import request from './services/request'
 
 // ==================== 认证 ====================
 export const authApi = {
+  /** 获取 RSA 公钥 */
+  getPublicKey: () => request.get('/auth/public-key'),
+
   /** 登录 → { token, username, role } */
   login: (username: string, password: string) =>
     request.post('/auth/login', { username, password }),
@@ -48,6 +51,12 @@ export const chatApi = {
   /** 删除会话 */
   deleteConversation: (convId: number) =>
     request.delete(`/chat/conversations/${convId}`),
+}
+
+// ==================== 管理员仪表盘 ====================
+export const adminApi = {
+  /** 仪表盘统计数据 → { userCount, documentCount, qaCount, todayQaCount } */
+  stats: () => request.get('/admin/stats'),
 }
 
 // ==================== 文档管理 ====================
