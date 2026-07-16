@@ -6,9 +6,12 @@ import com.hhu.campusqa.entity.Conversation;
 import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
+import com.hhu.campusqa.service.RagService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -20,17 +23,29 @@ import java.util.List;
 public class ChatController {
 
     private final QaService qaService;
+    private final RagService ragService;
 
-    public ChatController(QaService qaService) {
+    public ChatController(QaService qaService, RagService ragService) {
         this.qaService = qaService;
+        this.ragService = ragService;
     }
 
-    /** 提问（当前为占位实现） */
+    /** 提问（RAG 引擎，一次性返回） */
     @PostMapping("/ask")
     public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
+    }
+
+    /** 流式提问（SSE 打字机效果） */
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
+                                 HttpServletRequest request) {
+        // JWT 拦截器已校验登录态
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
+        ragService.streamAnswer(req.getQuestion(), emitter);
+        return emitter;
     }
 
     /** 问答历史（qa_record 汇总） */

@@ -69,4 +69,20 @@ export const docApi = {
   remove: (id: number) => request.delete(`/documents/${id}`),
 }
 
+// ==================== 管理后台（Admin） ====================
+export const adminApi = {
+  /** 仪表盘统计 → { docCount, userCount, qaCount } */
+  stats: () => request.get('/admin/stats'),
+
+  /** 全量问答记录分页 → Page<QaRecord> */
+  chatHistory: (page = 1, size = 10) =>
+    request.get('/admin/chat/history', { params: { page, size } }),
+
+  /** 单条问答详情 */
+  chatDetail: (id: number) => request.get(`/admin/chat/${id}`),
+
+  /** 重建向量索引 */
+  rebuildIndex: () => request.post('/admin/rebuild-index'),
+}
+
 export default request
