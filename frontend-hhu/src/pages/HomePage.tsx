@@ -113,7 +113,7 @@ export default function HomePage() {
       <section
         style={{
           position: 'relative',
-          background: `url('/images/campus/ijntan.png') center/cover no-repeat`,
+          background: `url('/images/campus/jintan.png') center/cover no-repeat`,
           padding: '80px 40px 100px',
           textAlign: 'center',
         }}
