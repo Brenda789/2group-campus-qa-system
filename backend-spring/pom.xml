@@ -29,8 +29,15 @@
         <!-- ========== MyBatis-Plus（含 MyBatis + 分页 + CRUD） ========== -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.10.1</version>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>3.5.15</version>
+        </dependency>
+
+        <!-- MyBatis-Plus 分页插件（3.5.9+ 已从 starter 中拆分，需单独引入） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.15</version>
         </dependency>
 
         <!-- ========== BCrypt 密码加密（仅 crypto，不含 Security 链） ========== -->
