@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Table, Tag, Button, message, Upload, Popconfirm } from 'antd'
-import { UploadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Table, Tag, Button, message, Upload, Popconfirm, Card, Typography } from 'antd'
+import { UploadOutlined, ReloadOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { docApi, adminApi } from '../api'
+
+const { Title, Text } = Typography
 
 export default function DocumentManage() {
   const [data, setData] = useState<any[]>([])
@@ -99,7 +101,7 @@ export default function DocumentManage() {
       title: '操作',
       render: (_: any, record: any) => (
         <Popconfirm
-          title="确定删除该文档？删除后不可恢复。"
+          title="确定删除该文档？删除后不可恢复"
           onConfirm={() => handleDelete(record.id)}
         >
           <Button size="small" danger>
@@ -112,42 +114,57 @@ export default function DocumentManage() {
 
   return (
     <>
-      <div style={{ marginBottom: 16 }}>
-        <Upload
-          beforeUpload={() => false} // 手动控制上传
-          onChange={handleUpload}
-          showUploadList={false}
-          accept=".pdf,.docx,.doc,.txt,.md"
-        >
-          <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
-            上传文档
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <Title level={3} style={{ marginBottom: 4, fontWeight: 700 }}>
+            <FileTextOutlined style={{ marginRight: 10, color: '#005BAC' }} />
+            知识库管理
+          </Title>
+          <Text type="secondary">管理文档切片，构建问答知识库</Text>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Upload
+            beforeUpload={() => false}
+            onChange={handleUpload}
+            showUploadList={false}
+            accept=".pdf,.docx,.doc,.txt,.md"
+          >
+            <Button type="primary" icon={<UploadOutlined />} loading={uploading} size="large"
+              style={{ borderRadius: 10, fontWeight: 600, height: 42 }}
+            >
+              上传文档
+            </Button>
+          </Upload>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={rebuilding}
+            onClick={handleRebuild}
+          >
+            重建索引
           </Button>
-        </Upload>
-        <Button
-          icon={<ReloadOutlined />}
-          loading={rebuilding}
-          onClick={handleRebuild}
-          style={{ marginLeft: 8 }}
-        >
-          重建索引
-        </Button>
-        <span style={{ marginLeft: 12, color: '#999', fontSize: 12 }}>
-          支持 PDF / DOCX / TXT / MD，最大 10MB
-        </span>
+          <Button onClick={() => load(1)}>刷新</Button>
+        </div>
       </div>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={data}
-        loading={loading}
-        pagination={{
-          current: page,
-          total,
-          pageSize: 10,
-          showTotal: (t) => `共 ${t} 条`,
-          onChange: (p) => load(p),
-        }}
-      />
+
+      <Card style={{ borderRadius: 16, border: '1px solid #eef2f7' }}>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          <InboxOutlined style={{ marginRight: 6 }} />
+          支持 PDF / DOCX / TXT / MD 格式，单文件最大 10MB
+        </Text>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={{
+            current: page,
+            total,
+            pageSize: 10,
+            showTotal: (t: number) => `共 ${t} 条`,
+            onChange: (p: number) => load(p),
+          }}
+        />
+      </Card>
     </>
   )
 }
