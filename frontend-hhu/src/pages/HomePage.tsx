@@ -123,7 +123,6 @@ export default function HomePage() {
           position: 'absolute', inset: 0,
           background: 'linear-gradient(180deg, rgba(10,37,64,0.85) 0%, rgba(13,59,102,0.75) 60%, rgba(240,244,249,1) 100%)',
         }} />
-        <div style={{ position: 'relative', zIndex: 1 }}>
         <img
           src="/images/logo.svg"
           alt="河海大学校徽"
@@ -132,13 +131,12 @@ export default function HomePage() {
             filter: 'drop-shadow(0 8px 24px rgba(14,165,233,0.40))',
           }}
         />
-        <Title level={2} style={{ color: 'rgba(255,255,255,0.90)', marginBottom: 16, fontWeight: 400, fontSize: 20 }}>
+        <Title level={2} style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 16, fontWeight: 400, fontSize: 20 }}>
           艰苦朴素 · 实事求是 · 严格要求 · 勇于探索
         </Title>
-        <Paragraph style={{ color: 'rgba(255,255,255,0.65)', fontSize: 15, maxWidth: 600, margin: '0 auto' }}>
+        <Paragraph style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, maxWidth: 600, margin: '0 auto' }}>
           一所以水利为特色、工科为主、多学科协调发展的教育部直属全国重点大学
         </Paragraph>
-        </div>
       </section>
 
       {/* 特色卡片 */}
