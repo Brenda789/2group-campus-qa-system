@@ -54,6 +54,30 @@ public class UserController {
         return Result.success();
     }
 
+    /** 修改密码 */
+    @PutMapping("/password")
+    public Result<Void> changePassword(@RequestBody Map<String, String> body,
+                                        HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+        if (oldPassword == null || newPassword == null) {
+            throw new BizException(400, "旧密码和新密码不能为空");
+        }
+        sysUserService.changePassword(userId, oldPassword, newPassword);
+        return Result.success();
+    }
+
+    /** 修改个人信息 */
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@RequestBody Map<String, String> body,
+                                       HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String email = body.get("email");
+        sysUserService.updateProfile(userId, email);
+        return Result.success();
+    }
+
     /** 获取当前用户信息 */
     @GetMapping("/me")
     public Result<?> me(HttpServletRequest request) {

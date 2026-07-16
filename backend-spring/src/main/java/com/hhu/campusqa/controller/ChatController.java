@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 问答接口
@@ -33,11 +34,23 @@ public class ChatController {
         return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
     }
 
-    /** 问答历史（qa_record 汇总） */
+    /** 问答历史（qa_record 汇总，支持关键词搜索） */
     @GetMapping("/history")
-    public Result<List<QaRecord>> history(HttpServletRequest request) {
+    public Result<List<QaRecord>> history(@RequestParam(required = false) String keyword,
+                                           HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        return Result.success(qaService.getHistory(userId));
+        return Result.success(qaService.getHistory(userId, keyword));
+    }
+
+    /** 问答点赞/踩 */
+    @PutMapping("/{id}/feedback")
+    public Result<Void> feedback(@PathVariable Long id,
+                                  @RequestBody Map<String, Integer> body,
+                                  HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Integer feedback = body.get("feedback");
+        qaService.updateFeedback(id, userId, feedback);
+        return Result.success();
     }
 
     // ==================== 会话（conversation） ====================

@@ -39,6 +39,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(                                 // 放行白名单
                         "/api/auth/login",
                         "/api/auth/register",
+                        "/api/auth/public-key",
                         "/api/health"
                 );
     }

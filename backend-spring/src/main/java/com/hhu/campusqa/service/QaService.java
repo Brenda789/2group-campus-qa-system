@@ -11,6 +11,7 @@ import com.hhu.campusqa.mapper.MessageMapper;
 import com.hhu.campusqa.mapper.QaRecordMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -33,12 +34,31 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
     // ==================== QaRecord（汇总） ====================
 
-    /** 查询某用户的问答历史 */
-    public List<QaRecord> getHistory(Long userId) {
-        return lambdaQuery()
-                .eq(QaRecord::getUserId, userId)
-                .orderByDesc(QaRecord::getCreateTime)
-                .list();
+    /** 查询某用户的问答历史（支持问题关键词模糊搜索） */
+    public List<QaRecord> getHistory(Long userId, String keyword) {
+        LambdaQueryWrapper<QaRecord> qw = new LambdaQueryWrapper<>();
+        qw.eq(QaRecord::getUserId, userId);
+        if (StringUtils.hasText(keyword)) {
+            qw.like(QaRecord::getQuestion, keyword);
+        }
+        qw.orderByDesc(QaRecord::getCreateTime);
+        return list(qw);
+    }
+
+    /** 对问答记录点赞/踩（仅所属用户可操作） */
+    public void updateFeedback(Long id, Long userId, Integer feedback) {
+        if (feedback == null || (feedback != 1 && feedback != -1 && feedback != 0)) {
+            throw new BizException(400, "feedback 必须为 1（赞）、-1（踩）或 0（取消）");
+        }
+        QaRecord record = getById(id);
+        if (record == null) {
+            throw new BizException(400, "问答记录不存在");
+        }
+        if (!record.getUserId().equals(userId)) {
+            throw new BizException(403, "只能评价自己的问答");
+        }
+        record.setFeedback(feedback);
+        updateById(record);
     }
 
     /**

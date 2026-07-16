@@ -89,6 +89,35 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return this.page(new Page<>(page, size), qw);
     }
 
+    /** 修改个人信息（邮箱等，用户名不可改） */
+    public void updateProfile(Long userId, String email) {
+        SysUser user = getById(userId);
+        if (user == null) {
+            throw new BizException(400, "用户不存在");
+        }
+        user.setEmail(email);
+        updateById(user);
+    }
+
+    /** 修改密码 */
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        SysUser user = getById(userId);
+        if (user == null) {
+            throw new BizException(400, "用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BizException(400, "旧密码错误");
+        }
+        if (oldPassword.equals(newPassword)) {
+            throw new BizException(400, "新密码不能与旧密码相同");
+        }
+        if (newPassword.length() < 6 || newPassword.length() > 20) {
+            throw new BizException(400, "新密码长度需在6-20位之间");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        updateById(user);
+    }
+
     /** 启停用户 */
     public void toggleUserStatus(Long id, Integer status) {
         SysUser user = getById(id);

@@ -36,6 +36,9 @@ public class QaRecord {
     /** 来源文档（JSON 数组字符串） */
     private String sourceDocs;
 
+    /** 评价：1=赞 / -1=踩 / 0=无 */
+    private Integer feedback;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 }

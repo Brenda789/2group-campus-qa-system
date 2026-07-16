@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 知识库文档管理接口（管理员）
@@ -24,13 +25,19 @@ public class DocumentController {
         this.kbDocumentService = kbDocumentService;
     }
 
-    /** 文档分页列表 */
+    /** 文档分页列表（管理员） */
     @GetMapping
     public Result<Page<KbDocument>> list(@RequestParam(defaultValue = "1") int page,
                                           @RequestParam(defaultValue = "10") int size,
                                           HttpServletRequest request) {
         checkAdmin(request);
         return Result.success(kbDocumentService.pageDocuments(page, size));
+    }
+
+    /** 公开搜索知识库文档（所有登录用户可用，仅返回已就绪的文档） */
+    @GetMapping("/search")
+    public Result<List<KbDocument>> search(@RequestParam(required = false) String keyword) {
+        return Result.success(kbDocumentService.searchDocuments(keyword));
     }
 
     /** 上传文档文件 */
