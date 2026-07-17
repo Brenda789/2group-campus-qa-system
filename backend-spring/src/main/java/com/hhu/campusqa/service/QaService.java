@@ -150,6 +150,70 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         return record;
     }
 
+    /**
+     * 流式问答完成后保存记录（由 ChatController 异步调用）。
+     * <p>
+     * 与 {@link #ask} 类似，但不会再次调用 RAG 引擎。
+     * </p>
+     *
+     * @param userId         用户 ID
+     * @param conversationId 会话 ID（null 则自动创建新会话）
+     * @param question       用户问题
+     * @param answer         RAG 完整答案
+     * @param sources        来源文档标题列表
+     * @return 会话 ID
+     */
+    @Transactional
+    public Long saveStreamQa(Long userId, Long conversationId, String question,
+                              String answer, List<String> sources) {
+        String sourceDocs;
+        try {
+            sourceDocs = objectMapper.writeValueAsString(sources);
+        } catch (JsonProcessingException e) {
+            log.error("来源序列化失败", e);
+            sourceDocs = "[]";
+        }
+
+        // 如果没有传入 conversationId，自动创建新会话
+        if (conversationId == null) {
+            Conversation conv = Conversation.builder()
+                    .userId(userId)
+                    .title(question.length() > 30 ? question.substring(0, 30) + "..." : question)
+                    .build();
+            conversationMapper.insert(conv);
+            conversationId = conv.getId();
+        }
+
+        // 保存 qa_record
+        QaRecord record = QaRecord.builder()
+                .userId(userId)
+                .conversationId(conversationId)
+                .question(question)
+                .answer(answer)
+                .sourceDocs(sourceDocs)
+                .build();
+        save(record);
+
+        // 保存用户消息
+        Message userMsg = Message.builder()
+                .conversationId(conversationId)
+                .role("user")
+                .content(question)
+                .build();
+        messageMapper.insert(userMsg);
+
+        // 保存 AI 回复
+        Message aiMsg = Message.builder()
+                .conversationId(conversationId)
+                .role("assistant")
+                .content(answer)
+                .sources(sourceDocs)
+                .build();
+        messageMapper.insert(aiMsg);
+
+        return conversationId;
+    }
+
     // ==================== Conversation（会话） ====================
 
     /** 查询某用户的会话列表 */

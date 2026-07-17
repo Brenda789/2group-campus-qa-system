@@ -99,6 +99,80 @@ export const chatApi = {
    *  不设 mock 降级——写操作必须透传后端错误。 */
   deleteConversation: (convId: number) =>
     request.delete(`/chat/conversations/${convId}`),
+
+  /**
+   * 流式提问（SSE 打字机效果）
+   *
+   * 通过 fetch + ReadableStream 消费 SSE 流，每收到一个 token 调用 onToken，
+   * 流结束后调用 onDone，出错调用 onError。
+   *
+   * @returns 取消函数（调用后中断请求）
+   */
+  streamAsk: (
+    question: string,
+    conversationId: number | undefined,
+    onToken: (text: string) => void,
+    onDone: (fullAnswer: string, conversationId?: number) => void,
+    onError: (err: string) => void,
+  ) => {
+    const controller = new AbortController()
+    const token = localStorage.getItem('token')
+    const baseUrl = 'http://localhost:8000/api'
+
+    fetch(`${baseUrl}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question, conversationId }),
+      signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        onError(`请求失败 (${res.status})`)
+        return
+      }
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let full = ''
+      let buffer = ''
+      let resolvedConvId: number | undefined = conversationId
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // 按行解析 SSE
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留不完整行
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6)
+
+          // 会话 ID 标记
+          if (data.startsWith('__CONV__')) {
+            const convIdStr = data.slice(8)
+            if (convIdStr && convIdStr !== 'new') {
+              resolvedConvId = Number(convIdStr)
+            }
+            continue
+          }
+
+          full += data
+          onToken(data)
+        }
+      }
+      onDone(full, resolvedConvId)
+    }).catch((err) => {
+      if (err.name !== 'AbortError') {
+        onError(err.message)
+      }
+    })
+
+    return () => controller.abort()
+  },
 }
 
 // ==================== 文档管理 ====================
@@ -126,6 +200,13 @@ export const docApi = {
 
   /** 重新处理单个文档 */
   reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
+
+  /** 查询单个文档（用于轮询处理状态） */
+  getById: (id: number) =>
+    request.get(`/documents/${id}`).catch(() => {
+      console.warn(`${MOCK_PREFIX} doc getById fallback id=${id}`)
+      return null
+    }),
 }
 
 // ==================== 管理后台（Admin） ====================

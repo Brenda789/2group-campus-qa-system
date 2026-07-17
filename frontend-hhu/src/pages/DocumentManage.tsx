@@ -61,13 +61,13 @@ export default function DocumentManage() {
     load()
   }, [load])
 
-  // 有进行中文档时，每 2 秒自动刷新
+  // 有进行中文档时，每 500ms 自动刷新（确保捕捉到所有中间状态）
   useEffect(() => {
     const processing = data.some((d) =>
       ['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING'].includes(d.status)
     )
     if (!processing) return
-    const timer = setInterval(() => load(page), 2000)
+    const timer = setInterval(() => load(page), 500)
     return () => clearInterval(timer)
   }, [data, page, load])
 

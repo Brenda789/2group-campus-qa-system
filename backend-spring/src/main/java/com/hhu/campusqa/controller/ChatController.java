@@ -9,16 +9,25 @@ import com.hhu.campusqa.service.QaService;
 import com.hhu.campusqa.service.RagService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 问答接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
@@ -41,19 +50,64 @@ public class ChatController {
 
     /** 流式提问（SSE 打字机效果；支持匿名） */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
+    public ResponseEntity<StreamingResponseBody> streamAsk(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
         Long userId = (Long) request.getAttribute("userId");
-        if (userId == null) {
-            // 匿名：只推送答案，不存库
-            ragService.streamAnswer(req.getQuestion(), emitter);
-        } else {
-            // 登录用户：推送答案 + 异步存库
-            ragService.streamAnswer(req.getQuestion(), emitter);
-            // 注：流式场景下异步保存比较复杂，当前保持与原有逻辑一致
-        }
-        return emitter;
+
+        StreamingResponseBody body = outputStream -> {
+            PrintWriter writer = new PrintWriter(
+                    new OutputStreamWriter(outputStream, StandardCharsets.UTF_8), true);
+
+            // 登录用户：先创建会话，发送 convId 给前端
+            final Long[] convIdHolder = new Long[1];
+            if (userId != null) {
+                // 使用前端传来的 conversationId，否则创建新会话
+                if (req.getConversationId() != null) {
+                    convIdHolder[0] = req.getConversationId();
+                }
+                // 新会话由 saveStreamQa 自动创建，这里先发送占位
+                writer.write("data: __CONV__" +
+                        (convIdHolder[0] != null ? convIdHolder[0] : "new") + "\n\n");
+                writer.flush();
+            }
+
+            CountDownLatch latch = new CountDownLatch(1);
+
+            if (userId == null) {
+                // 匿名：只推送答案，不存库
+                ragService.streamAnswer(req.getQuestion(), writer, result -> latch.countDown());
+            } else {
+                // 登录用户：推送答案 + 完成后异步存库
+                final String question = req.getQuestion();
+                ragService.streamAnswer(req.getQuestion(), writer, result -> {
+                    // 异步保存，不阻塞 SSE 流关闭
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            Long savedConvId = qaService.saveStreamQa(
+                                    userId, convIdHolder[0], question,
+                                    result.answer(), result.sources());
+                            log.info("流式问答已保存: convId={}", savedConvId);
+                        } catch (Exception e) {
+                            log.error("保存流式问答记录失败", e);
+                        }
+                    });
+                    latch.countDown();
+                });
+            }
+
+            try {
+                boolean ok = latch.await(5, TimeUnit.MINUTES);
+                if (!ok) {
+                    log.warn("流式问答超时 (5分钟)");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .body(body);
     }
 
     /** 问答历史（qa_record 汇总，支持关键词搜索） */

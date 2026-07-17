@@ -9,13 +9,13 @@ import com.hhu.campusqa.mapper.KbDocumentMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -115,53 +115,66 @@ public class RagService {
     }
 
     /**
-     * 流式问答（SSE）
+     * 流式问答（SSE），通过 PrintWriter 逐字推送给前端。
      * <p>
-     * 通过 SseEmitter 逐字推送给前端，实现打字机效果。
+     * 内部通过 WebClient 的异步流式管道消费 LLM 返回的 token，
+     * 写入 writer 后立即 flush。完成后回调 onComplete。
      * </p>
+     *
+     * @param question   用户问题
+     * @param writer     SSE 输出流（autoFlush）
+     * @param onComplete 流式完成回调，携带完整答案 + 来源列表（null 表示无需回调）
      */
-    public void streamAnswer(String question, SseEmitter emitter) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                // 1. 确保索引已构建
-                ensureIndex();
+    public void streamAnswer(String question, PrintWriter writer, Consumer<StreamResult> onComplete) {
+        try {
+            // 1. 确保索引已构建
+            ensureIndex();
 
-                if (vectorStore.size() == 0) {
-                    emitter.send(SseEmitter.event().data("知识库中没有文档，请先上传文档。"));
-                    emitter.complete();
-                    return;
+            if (vectorStore.size() == 0) {
+                writeSse(writer, "知识库中没有文档，请先上传文档。");
+                if (onComplete != null) {
+                    onComplete.accept(new StreamResult("知识库中没有文档，请先上传文档。", List.of()));
                 }
-
-                // 2. 问题 → 向量
-                float[] qVec = embeddingService.embed(question);
-                if (qVec.length == 0) {
-                    emitter.send(SseEmitter.event().data("Embedding 服务异常，请稍后重试。"));
-                    emitter.complete();
-                    return;
-                }
-
-                // 3. 检索
-                List<ScoredChunk> retrieved = vectorStore.search(qVec, config.getTopK());
-                if (retrieved.isEmpty()) {
-                    emitter.send(SseEmitter.event().data("未找到相关知识库内容。"));
-                    emitter.complete();
-                    return;
-                }
-
-                // 4. 构建 Prompt + 流式调用 LLM
-                String userMessage = buildUserMessage(question, retrieved);
-                callLlmStream(userMessage, emitter);
-
-            } catch (Exception e) {
-                log.error("流式问答异常", e);
-                try {
-                    emitter.send(SseEmitter.event().data("系统异常，请稍后重试。"));
-                    emitter.complete();
-                } catch (IOException ignored) {
-                    emitter.completeWithError(e);
-                }
+                return;
             }
-        });
+
+            // 2. 问题 → 向量
+            float[] qVec = embeddingService.embed(question);
+            if (qVec.length == 0) {
+                writeSse(writer, "Embedding 服务异常，请稍后重试。");
+                if (onComplete != null) {
+                    onComplete.accept(new StreamResult("Embedding 服务异常，请稍后重试。", List.of()));
+                }
+                return;
+            }
+
+            // 3. 检索
+            List<ScoredChunk> retrieved = vectorStore.search(qVec, config.getTopK());
+            if (retrieved.isEmpty()) {
+                writeSse(writer, "未找到相关知识库内容。");
+                if (onComplete != null) {
+                    onComplete.accept(new StreamResult("未找到相关知识库内容。", List.of()));
+                }
+                return;
+            }
+
+            // 4. 提取来源
+            List<String> sources = retrieved.stream()
+                    .map(ScoredChunk::getSource)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 5. 构建 Prompt + 流式调用 LLM
+            String userMessage = buildUserMessage(question, retrieved);
+            callLlmStream(userMessage, writer, sources, onComplete);
+
+        } catch (Exception e) {
+            log.error("流式问答异常", e);
+            writeSse(writer, "系统异常，请稍后重试。");
+            if (onComplete != null) {
+                onComplete.accept(new StreamResult("系统异常，请稍后重试。", List.of()));
+            }
+        }
     }
 
     // ==================== 索引管理 ====================
@@ -308,6 +321,7 @@ public class RagService {
         kbDocumentMapper.updateById(doc);
         String text = parserService.parse(doc.getFilePath(), doc.getFileType());
         String taggedText = "[来源：" + doc.getTitle() + "]\n" + text;
+        holdStatus(); // 确保前端能观察到"解析中"状态
 
         // 2. 文本切片
         doc.setStatus("SPLITTING");
@@ -316,6 +330,7 @@ public class RagService {
         for (TextChunk chunk : chunks) {
             chunk.setSource(doc.getTitle());
         }
+        holdStatus(); // 确保前端能观察到"切片中"状态
 
         // 3. Embedding 向量化
         doc.setStatus("EMBEDDING");
@@ -324,6 +339,7 @@ public class RagService {
                 .map(TextChunk::getText)
                 .collect(Collectors.toList());
         List<float[]> vecs = embeddingService.embedBatch(chunkTexts);
+        holdStatus(); // 确保前端能观察到"向量化中"状态
 
         // 4. 过滤空向量 + 入库
         List<TextChunk> validChunks = new ArrayList<>();
@@ -432,10 +448,15 @@ public class RagService {
     }
 
     /**
-     * 流式调用 LLM，通过 SseEmitter 推送
+     * 流式调用 LLM，通过 PrintWriter 推送 SSE token。
+     * <p>
+     * 注意：Reactor Netty 的 bodyToFlux(String.class) 在处理 text/event-stream
+     * 时可能自动剥离 "data: " 前缀，因此需兼容两种格式。
+     * </p>
      */
     @SuppressWarnings("unchecked")
-    private void callLlmStream(String userMessage, SseEmitter emitter) {
+    private void callLlmStream(String userMessage, PrintWriter writer,
+                               List<String> sources, Consumer<StreamResult> onComplete) {
         Map<String, Object> body = Map.of(
                 "model", config.getLlmModel(),
                 "temperature", config.getTemperature(),
@@ -446,6 +467,8 @@ public class RagService {
                 "stream", true
         );
 
+        StringBuilder fullAnswer = new StringBuilder();
+
         try {
             llmClient.post()
                     .uri(DASHSCOPE_LLM_URL)
@@ -453,62 +476,95 @@ public class RagService {
                     .retrieve()
                     .bodyToFlux(String.class)
                     .doOnNext(line -> {
-                        // SSE 格式: "data: {...}"
+                        // Reactor Netty 可能已剥除 SSE "data:" 前缀，也可能保留
+                        //   - 保留时: "data: {...}" 或 "data: [DONE]"
+                        //   - 剥除时: "{...}" 或 "[DONE]"
+                        String json;
                         if (line.startsWith("data: ")) {
-                            String data = line.substring(6).trim();
-                            if ("[DONE]".equals(data)) {
-                                emitter.complete();
-                                return;
-                            }
-                            try {
-                                Map<String, Object> chunk = objectMapper.readValue(data, Map.class);
-                                List<Map<String, Object>> choices =
-                                        (List<Map<String, Object>>) chunk.get("choices");
-                                if (choices != null && !choices.isEmpty()) {
-                                    Map<String, Object> delta =
-                                            (Map<String, Object>) choices.get(0).get("delta");
-                                    if (delta != null) {
-                                        String content = (String) delta.get("content");
-                                        if (content != null && !content.isEmpty()) {
-                                            emitter.send(SseEmitter.event().data(content));
-                                        }
+                            json = line.substring(6).trim();
+                        } else {
+                            json = line.trim();
+                        }
+                        if (json.isEmpty()) {
+                            return;
+                        }
+                        if ("[DONE]".equals(json)) {
+                            return;
+                        }
+                        if (!json.startsWith("{")) {
+                            return;
+                        }
+                        try {
+                            Map<String, Object> chunk = objectMapper.readValue(json, Map.class);
+                            List<Map<String, Object>> choices =
+                                    (List<Map<String, Object>>) chunk.get("choices");
+                            if (choices != null && !choices.isEmpty()) {
+                                Map<String, Object> delta =
+                                        (Map<String, Object>) choices.get(0).get("delta");
+                                if (delta != null) {
+                                    String content = (String) delta.get("content");
+                                    if (content != null && !content.isEmpty()) {
+                                        fullAnswer.append(content);
+                                        writeSse(writer, content);
                                     }
                                 }
-                            } catch (IOException e) {
-                                // emitter.send() 或 JSON 解析失败
-                                log.error("SSE 推送失败: {}", e.toString());
-                            } catch (Exception e) {
-                                // 其他异常（NPE、类型转换等），跳过该行
-                                log.debug("SSE 行解析跳过: {}", truncate(data, 100));
                             }
+                        } catch (UncheckedIOException e) {
+                            log.warn("SSE 写入失败（客户端可能已断开）: {}", e.toString());
+                        } catch (Exception e) {
+                            log.debug("SSE 行解析跳过: {} | err={}",
+                                    truncate(json, 100), e.toString());
                         }
                     })
                     .doOnError(e -> {
                         log.error("LLM 流式调用失败: {}", e.toString());
-                        try {
-                            emitter.send(SseEmitter.event().data("\n\n[AI 服务中断，请稍后重试]"));
-                            emitter.complete();
-                        } catch (IOException ignored) {
-                            emitter.completeWithError(e);
+                        writeSse(writer, "\n\n[AI 服务中断，请稍后重试]");
+                        if (onComplete != null) {
+                            onComplete.accept(new StreamResult(fullAnswer.toString(), sources));
                         }
                     })
                     .doOnComplete(() -> {
-                        try {
-                            emitter.complete();
-                        } catch (Exception e) {
-                            log.warn("SSE 完成通知失败", e);
+                        log.info("流式问答完成: answer=\"{}\"", truncate(fullAnswer.toString(), 50));
+                        if (onComplete != null) {
+                            onComplete.accept(new StreamResult(fullAnswer.toString(), sources));
                         }
                     })
                     .subscribe();
 
         } catch (Exception e) {
             log.error("LLM 流式请求失败: {}", e.toString());
-            try {
-                emitter.send(SseEmitter.event().data("AI 服务暂时不可用，请稍后重试。"));
-                emitter.complete();
-            } catch (IOException ignored) {
-                emitter.completeWithError(e);
+            writeSse(writer, "AI 服务暂时不可用，请稍后重试。");
+            if (onComplete != null) {
+                onComplete.accept(new StreamResult(fullAnswer.toString(), sources));
             }
+        }
+    }
+
+    // ==================== SSE 写入工具 ====================
+
+    /** 写入一条 SSE 数据帧并立即 flush */
+    private void writeSse(PrintWriter writer, String data) {
+        writer.write("data: " + data + "\n\n");
+        writer.flush();
+    }
+
+    // ==================== 流式结果 ====================
+
+    /** 流式问答完成后的汇总结果 */
+    public record StreamResult(String answer, List<String> sources) {}
+
+    /**
+     * 短暂停顿（300ms），确保前端轮询（500ms 间隔）能捕捉到每个处理状态。
+     * <p>
+     * SPLITTING（纯 CPU 毫秒级）和 EMBEDDING（API 调用 1-2s）在快速轮询下
+     * 仍可能被跳过，加入 300ms 延迟让每个状态至少持续一个轮询周期的 60%。
+     * </p>
+     */
+    private void holdStatus() {
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

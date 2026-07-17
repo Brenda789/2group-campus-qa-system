@@ -66,7 +66,19 @@ export default function HomePage() {
   const [hoveredConv, setHoveredConv] = useState<number | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string>('') // 文档处理状态
+  const [uploadDocId, setUploadDocId] = useState<number | null>(null)
+  const uploadPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msgEnd = useRef<HTMLDivElement>(null)
+  const cancelStream = useRef<(() => void) | null>(null)
+
+  // 组件卸载时取消进行中的流式请求 + 清理上传轮询
+  useEffect(() => {
+    return () => {
+      cancelStream.current?.()
+      if (uploadPollRef.current) clearInterval(uploadPollRef.current)
+    }
+  }, [])
 
   // ======== 访客模式：本地会话存储（刷新即消失） ========
   const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
@@ -136,51 +148,85 @@ export default function HomePage() {
     setMessages(guestConvs[convId] || [])
   }
 
-  // ==================== 发送消息 ====================
+  // ==================== 发送消息（流式） ====================
 
-  const send = async (text: string) => {
+  const send = (text: string) => {
     if (!text.trim() || loading) return
     const q = text.trim()
     setInput('')
+
+    // 取消上一个进行中的流（如果有）
+    cancelStream.current?.()
+
     setMessages((prev) => [...prev, { role: 'user', content: q }])
     setLoading(true)
-    try {
-      const res: any = await chatApi.ask(q, isLoggedIn ? (activeConvId ?? undefined) : undefined)
 
-      const assistantMsg: Message = {
-        role: 'assistant',
-        content: res.answer || '（未获取到回答）',
-        sources: safeParseSources(res.sourceDocs),
-      }
+    // 先插入空的 assistant bubble（打字机效果将逐字填充）
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
-      if (isLoggedIn) {
-        // ---- 登录用户：后端持久化 ----
-        setMessages((prev) => [...prev, assistantMsg])
-        if (!activeConvId && res.conversationId) {
-          setActiveConvId(res.conversationId)
-        }
-        loadConversationsFromApi()
-      } else {
-        // ---- 访客：本地存储 ----
-        let convId = activeConvId
-        if (convId === null) {
-          // 新会话
-          convId = guestNextId
-          setGuestNextId((n) => n + 1)
-          setActiveConvId(convId)
-        }
-        setGuestConvs((prev) => {
-          const existing = prev[convId!] || []
-          return { ...prev, [convId!]: [...existing, { role: 'user', content: q }, assistantMsg] }
+    cancelStream.current = chatApi.streamAsk(
+      q,
+      isLoggedIn ? (activeConvId ?? undefined) : undefined,
+      // ---- onToken：逐字追加 ----
+      (token) => {
+        setMessages((prev) => {
+          const updated = [...prev]
+          const lastIdx = updated.length - 1
+          if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+            updated[lastIdx] = { ...updated[lastIdx], content: updated[lastIdx].content + token }
+          }
+          return updated
         })
-        setMessages((prev) => [...prev, assistantMsg])
-        loadConversationsFromLocal()
-      }
-    } catch {
-      message.error('发送失败，请稍后重试')
-    } finally {
-      setLoading(false)
-    }
+      },
+      // ---- onDone：流结束 ----
+      (fullAnswer, resolvedConvId) => {
+        cancelStream.current = null
+        setLoading(false)
+
+        if (isLoggedIn) {
+          // 登录用户：后端已异步保存，刷新会话列表
+          if (!activeConvId && resolvedConvId) {
+            setActiveConvId(resolvedConvId)
+          }
+          loadConversationsFromApi()
+        } else {
+          // 访客：本地存储
+          let convId = activeConvId
+          if (convId === null) {
+            convId = guestNextId
+            setGuestNextId((n) => n + 1)
+            setActiveConvId(convId)
+          }
+          setGuestConvs((prev) => {
+            const existing = prev[convId!] || []
+            return {
+              ...prev,
+              [convId!]: [
+                ...existing,
+                { role: 'user', content: q },
+                { role: 'assistant', content: fullAnswer },
+              ],
+            }
+          })
+          loadConversationsFromLocal()
+        }
+      },
+      // ---- onError：流中断 ----
+      (err) => {
+        cancelStream.current = null
+        setLoading(false)
+        message.error('发送失败: ' + err)
+        // 最后一个空 bubble 显示错误信息
+        setMessages((prev) => {
+          const updated = [...prev]
+          const lastIdx = updated.length - 1
+          if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant' && !updated[lastIdx].content) {
+            updated[lastIdx] = { ...updated[lastIdx], content: `[错误] ${err}` }
+          }
+          return updated
+        })
+      },
+    )
   }
 
   // ==================== 会话操作 ====================
@@ -227,19 +273,65 @@ export default function HomePage() {
     }
   }
 
-  // ==================== 上传文档 ====================
+  // ==================== 上传文档（含状态追踪） ====================
+
+  const STATUS_LABELS: Record<string, string> = {
+    PROCESSING: '排队处理中',
+    PARSING: '解析文件中',
+    SPLITTING: '文本切片中',
+    EMBEDDING: '向量化中',
+    READY: '处理完成',
+    ERROR: '处理失败',
+  }
+
+  const clearUploadState = () => {
+    setUploading(false)
+    setUploadDocId(null)
+    setUploadStatus('')
+    if (uploadPollRef.current) {
+      clearInterval(uploadPollRef.current)
+      uploadPollRef.current = null
+    }
+  }
 
   const handleUpload = async (info: any) => {
     const file = info.file as File
     setUploading(true)
+    setUploadStatus('PROCESSING')
+
     try {
-      await docApi.upload(file)
-      message.success('上传成功，正在处理')
-      setUploadOpen(false)
+      const doc: any = await docApi.upload(file)
+      if (!doc?.id) {
+        message.error('上传返回异常')
+        clearUploadState()
+        return
+      }
+      setUploadDocId(doc.id)
+
+      // 每 500ms 轮询文档状态
+      uploadPollRef.current = setInterval(async () => {
+        try {
+          const latest: any = await docApi.getById(doc.id)
+          if (!latest) return
+
+          setUploadStatus(latest.status)
+
+          if (latest.status === 'READY') {
+            clearUploadState()
+            setUploadOpen(false)
+            message.success(`处理完成，共 ${latest.chunkCount ?? 0} 个切片`)
+          } else if (latest.status === 'ERROR') {
+            clearUploadState()
+            message.error('文档处理失败，请检查文件格式')
+          }
+        } catch {
+          // 轮询失败不提示，等下次重试
+        }
+      }, 500)
+
     } catch (e: any) {
       message.error(e?.message || '上传失败')
-    } finally {
-      setUploading(false)
+      clearUploadState()
     }
   }
 
@@ -719,7 +811,7 @@ export default function HomePage() {
       <Modal
         title="上传文档到知识库"
         open={uploadOpen}
-        onCancel={() => setUploadOpen(false)}
+        onCancel={() => { clearUploadState(); setUploadOpen(false) }}
         footer={null}
         destroyOnClose
       >
@@ -727,16 +819,101 @@ export default function HomePage() {
           支持 PDF / DOCX / TXT / MD，最大 10MB
           {!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}
         </p>
-        <Upload
-          beforeUpload={() => false}
-          onChange={handleUpload}
-          showUploadList={false}
-          accept=".pdf,.docx,.doc,.txt,.md"
-        >
-          <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
-            选择文件上传
-          </Button>
-        </Upload>
+
+        {/* 未开始上传：显示上传按钮 */}
+        {!uploadStatus && (
+          <Upload
+            beforeUpload={() => false}
+            onChange={handleUpload}
+            showUploadList={false}
+            accept=".pdf,.docx,.doc,.txt,.md"
+          >
+            <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
+              选择文件上传
+            </Button>
+          </Upload>
+        )}
+
+        {/* 上传中 / 处理中：显示进度步骤 */}
+        {uploadStatus && (
+          <div style={{ padding: '8px 0' }}>
+            {(['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING', 'READY', 'ERROR'] as const).map((key) => {
+              const label = STATUS_LABELS[key]
+              const statusOrder = ['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING', 'READY']
+              const currentIdx = statusOrder.indexOf(uploadStatus)
+              const stepIdx = statusOrder.indexOf(key)
+
+              // 当前步骤及之前的都亮起
+              const isActive = stepIdx <= currentIdx
+              const isCurrent = key === uploadStatus
+              const isError = key === 'ERROR' && uploadStatus === 'ERROR'
+
+              // ERROR 不在正常流程里，单独处理
+              if (key === 'ERROR') {
+                if (uploadStatus !== 'ERROR') return null
+                return (
+                  <div key={key} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 0', color: '#ff4d4f', fontWeight: 500,
+                  }}>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: '#ff4d4f', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700,
+                    }}>✕</span>
+                    <span>{STATUS_LABELS.ERROR}</span>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={key} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 0',
+                  color: isActive ? '#005BAC' : '#ccc',
+                  fontWeight: isCurrent ? 600 : 400,
+                  transition: 'color 0.3s',
+                }}>
+                  {/* 步骤圆点 */}
+                  {isCurrent ? (
+                    <span style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: '#005BAC',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      animation: 'pulse 1.2s ease-in-out infinite',
+                    }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', background: '#fff',
+                      }} />
+                    </span>
+                  ) : isActive ? (
+                    <span style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: '#005BAC', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700,
+                    }}>✓</span>
+                  ) : (
+                    <span style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      border: '2px solid #ddd', background: '#fff',
+                    }} />
+                  )}
+                  <span>{label}</span>
+                  {isCurrent && <Spin size="small" />}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* 上传中不可关闭提示 */}
+        {uploadStatus && uploadStatus !== 'READY' && uploadStatus !== 'ERROR' && (
+          <p style={{ color: '#faad14', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+            处理中，请勿关闭此窗口
+          </p>
+        )}
       </Modal>
     </div>
   )
