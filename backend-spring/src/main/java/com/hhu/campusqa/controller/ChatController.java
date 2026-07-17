@@ -30,7 +30,7 @@ public class ChatController {
         this.ragService = ragService;
     }
 
-    /** 提问（RAG 引擎，一次性返回） */
+    /** 提问（RAG 引擎，一次性返回；支持匿名） */
     @PostMapping("/ask")
     public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
@@ -38,13 +38,20 @@ public class ChatController {
         return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
     }
 
-    /** 流式提问（SSE 打字机效果） */
+    /** 流式提问（SSE 打字机效果；支持匿名） */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
-        // JWT 拦截器已校验登录态
         SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
-        ragService.streamAnswer(req.getQuestion(), emitter);
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            // 匿名：只推送答案，不存库
+            ragService.streamAnswer(req.getQuestion(), emitter);
+        } else {
+            // 登录用户：推送答案 + 异步存库
+            ragService.streamAnswer(req.getQuestion(), emitter);
+            // 注：流式场景下异步保存比较复杂，当前保持与原有逻辑一致
+        }
         return emitter;
     }
 
@@ -52,6 +59,7 @@ public class ChatController {
     @GetMapping("/history")
     public Result<List<QaRecord>> history(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return Result.success(List.of());
         return Result.success(qaService.getHistory(userId));
     }
 
@@ -61,6 +69,7 @@ public class ChatController {
     @GetMapping("/conversations")
     public Result<List<Conversation>> conversations(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return Result.success(List.of());
         return Result.success(qaService.getConversations(userId));
     }
 

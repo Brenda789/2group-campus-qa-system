@@ -153,7 +153,7 @@ public class RagService {
                 callLlmStream(userMessage, emitter);
 
             } catch (Exception e) {
-                log.error("流式问答异常: {}", e.toString());
+                log.error("流式问答异常", e);
                 try {
                     emitter.send(SseEmitter.event().data("系统异常，请稍后重试。"));
                     emitter.complete();
@@ -276,6 +276,13 @@ public class RagService {
     }
 
     /**
+     * 精确移除文档的向量（删除单个文档时调用，避免全量重建）
+     */
+    public synchronized void removeDocumentVectors(String title) {
+        vectorStore.removeBySource(title);
+    }
+
+    /**
      * 文档变更后重建索引
      * <p>
      * 清空向量库，从数据库重新加载所有文档并构建索引。
@@ -289,23 +296,36 @@ public class RagService {
 
     /**
      * 解析并向量化单个文档，加入向量库
+     * <p>
+     * 每完成一个阶段更新数据库状态，方便前端展示处理进度。
+     * </p>
      *
      * @return 成功入库的切片数
      */
     private int processOneDocument(KbDocument doc) {
+        // 1. 解析文件
+        doc.setStatus("PARSING");
+        kbDocumentMapper.updateById(doc);
         String text = parserService.parse(doc.getFilePath(), doc.getFileType());
         String taggedText = "[来源：" + doc.getTitle() + "]\n" + text;
 
+        // 2. 文本切片
+        doc.setStatus("SPLITTING");
+        kbDocumentMapper.updateById(doc);
         List<TextChunk> chunks = splitterService.split(taggedText);
         for (TextChunk chunk : chunks) {
             chunk.setSource(doc.getTitle());
         }
 
+        // 3. Embedding 向量化
+        doc.setStatus("EMBEDDING");
+        kbDocumentMapper.updateById(doc);
         List<String> chunkTexts = chunks.stream()
                 .map(TextChunk::getText)
                 .collect(Collectors.toList());
         List<float[]> vecs = embeddingService.embedBatch(chunkTexts);
 
+        // 4. 过滤空向量 + 入库
         List<TextChunk> validChunks = new ArrayList<>();
         List<float[]> validVecs = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
@@ -320,6 +340,39 @@ public class RagService {
         }
 
         return validChunks.size();
+    }
+
+    /**
+     * 重新处理单个文档（A6 补全：单文档重处理）
+     * <p>
+     * 先移除旧向量，再重新解析→切片→Embedding→入库。
+     * 与 {@link #addDocument} / {@link #buildIndex} 互斥（synchronized）。
+     * </p>
+     */
+    public synchronized void reprocessDocument(KbDocument doc) {
+        log.info("重新处理文档 [{}] (id={})", doc.getTitle(), doc.getId());
+        try {
+            // 移除旧向量
+            int removed = vectorStore.removeBySource(doc.getTitle());
+            log.info("已移除文档 [{}] 的 {} 条旧向量", doc.getTitle(), removed);
+
+            // 重新处理
+            int validCount = processOneDocument(doc);
+
+            doc.setStatus("READY");
+            doc.setChunkCount(validCount);
+            kbDocumentMapper.updateById(doc);
+
+            indexBuilt = true;
+            log.info("文档 [{}] 重新处理完成: {} 个有效切片, 向量库总量={}",
+                    doc.getTitle(), validCount, vectorStore.size());
+
+        } catch (Exception e) {
+            log.error("文档 [{}] (id={}) 重新处理失败: {}", doc.getTitle(), doc.getId(), e.toString());
+            doc.setStatus("ERROR");
+            doc.setChunkCount(0);
+            kbDocumentMapper.updateById(doc);
+        }
     }
 
     // ==================== Prompt 构建 ====================
@@ -442,7 +495,9 @@ public class RagService {
                     .doOnComplete(() -> {
                         try {
                             emitter.complete();
-                        } catch (Exception ignored) {}
+                        } catch (Exception e) {
+                            log.warn("SSE 完成通知失败", e);
+                        }
                     })
                     .subscribe();
 

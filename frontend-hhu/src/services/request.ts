@@ -34,10 +34,16 @@ request.interceptors.response.use(
   },
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      if (!window.location.hash.includes('login')) {
-        window.location.href = '/#/login'
+      // 只在已登录用户 token 过期时才跳转登录页
+      // 匿名用户访问需要登录的接口（如 /api/chat/history）时静默失败
+      const token = localStorage.getItem('token')
+      if (token) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('role')
+        if (!window.location.hash.includes('login')) {
+          window.location.href = '/#/login'
+        }
       }
     }
     return Promise.reject(err)

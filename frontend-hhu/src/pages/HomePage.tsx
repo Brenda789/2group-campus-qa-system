@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Button, Input, Card, message, Space, Tag, Spin, Modal } from 'antd'
+import { Button, Input, Card, message, Space, Tag, Spin, Modal, Upload } from 'antd'
 import {
   RobotOutlined,
   SendOutlined,
@@ -7,8 +7,10 @@ import {
   DeleteOutlined,
   PlusOutlined,
   MessageOutlined,
+  UploadOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
-import { chatApi } from '../api'
+import { chatApi, docApi } from '../api'
 
 interface MessageItem {
   role: 'user' | 'assistant'
@@ -39,16 +41,20 @@ export default function HomePage() {
   const [activeConvId, setActiveConvId] = useState<number | null>(null)
   const [convLoading, setConvLoading] = useState(false)
   const [hoveredConv, setHoveredConv] = useState<number | null>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
+
+  const loggedIn = !!localStorage.getItem('token')
 
   // 自动滚动到底部
   useEffect(() => {
     msgEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 打开聊天窗口时加载会话列表
+  // 打开聊天窗口时加载会话列表（仅登录用户）
   useEffect(() => {
-    if (chatOpen) loadConversations()
+    if (chatOpen && loggedIn) loadConversations()
   }, [chatOpen])
 
   const loadConversations = async () => {
@@ -107,6 +113,21 @@ export default function HomePage() {
     }
   }
 
+  // ==================== 上传文档 ====================
+  const handleUpload = async (info: any) => {
+    const file = info.file as File
+    setUploading(true)
+    try {
+      await docApi.upload(file)
+      message.success('上传成功，正在处理')
+      setUploadOpen(false)
+    } catch (e: any) {
+      message.error(e?.message || '上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   // ==================== 会话操作 ====================
   const selectConversation = (convId: number) => {
     setActiveConvId(convId)
@@ -148,7 +169,14 @@ export default function HomePage() {
       >
         <h1 style={{ margin: 0, fontSize: 20 }}>🌊 河海大学校园门户</h1>
         <Space>
-          <Button ghost href="#/login">管理后台</Button>
+          <Button ghost onClick={() => setUploadOpen(true)} icon={<UploadOutlined />}>
+            上传文档
+          </Button>
+          {loggedIn ? (
+            <Button ghost href="#/admin">管理后台</Button>
+          ) : (
+            <Button ghost href="#/login" icon={<UserOutlined />}>登录</Button>
+          )}
         </Space>
       </header>
 
@@ -211,7 +239,8 @@ export default function HomePage() {
           }}
           styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden' } }}
         >
-          {/* ======== 左侧：会话列表 ======== */}
+          {/* ======== 左侧：会话列表（仅登录用户可见） ======== */}
+          {loggedIn && (
           <div
             style={{
               width: 200,
@@ -299,6 +328,7 @@ export default function HomePage() {
               )}
             </div>
           </div>
+          )}
 
           {/* ======== 右侧：对话区 ======== */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -381,6 +411,30 @@ export default function HomePage() {
           </div>
         </Card>
       )}
+
+      {/* 上传文档 Modal */}
+      <Modal
+        title="上传文档到知识库"
+        open={uploadOpen}
+        onCancel={() => setUploadOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <p style={{ color: '#999', marginBottom: 16 }}>
+          支持 PDF / DOCX / TXT / MD，最大 10MB
+          {!loggedIn && '。未登录上传为临时文档，服务重启后清理'}
+        </p>
+        <Upload
+          beforeUpload={() => false}
+          onChange={handleUpload}
+          showUploadList={false}
+          accept=".pdf,.docx,.doc,.txt,.md"
+        >
+          <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
+            选择文件上传
+          </Button>
+        </Upload>
+      </Modal>
     </div>
   )
 }

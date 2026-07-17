@@ -6,18 +6,26 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.entity.KbDocument;
 import com.hhu.campusqa.mapper.KbDocumentMapper;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * 知识库文档服务
+ * <p>
+ * 支持匿名上传（临时文档，服务重启后清理）和登录上传（持久化）。
+ * </p>
  */
+@Slf4j
 @Service
 public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument> {
 
@@ -30,9 +38,21 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         this.ragService = ragService;
     }
 
-    /** 分页查询文档列表 */
-    public Page<KbDocument> pageDocuments(int page, int size) {
+    /** 启动时清理上次运行残留的临时文档 */
+    @PostConstruct
+    public void init() {
+        cleanTemporaryDocuments();
+    }
+
+    /** 分页查询文档列表（支持按名称搜索、按状态筛选） */
+    public Page<KbDocument> pageDocuments(int page, int size, String keyword, String status) {
         LambdaQueryWrapper<KbDocument> qw = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.isBlank()) {
+            qw.like(KbDocument::getTitle, keyword);
+        }
+        if (status != null && !status.isBlank()) {
+            qw.eq(KbDocument::getStatus, status);
+        }
         qw.orderByDesc(KbDocument::getCreateTime);
         return this.page(new Page<>(page, size), qw);
     }
@@ -42,26 +62,24 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
      *
      * @param originalFilename 原始文件名
      * @param fileBytes        文件字节内容
-     * @param uploadedBy       上传者 ID
+     * @param uploadedBy       上传者 ID（匿名时为 null）
      * @return 创建的文档记录
      */
     public KbDocument upload(String originalFilename, byte[] fileBytes, Long uploadedBy) {
-        // 1. 提取文件类型
         String fileType = getFileType(originalFilename);
-
-        // 2. 生成唯一存储名，防止覆盖
         String storedName = UUID.randomUUID().toString() + "." + fileType;
         Path targetPath = Paths.get(UPLOAD_DIR, storedName);
 
-        // 3. 确保上传目录存在
         try {
             Files.createDirectories(targetPath.getParent());
             Files.write(targetPath, fileBytes);
         } catch (IOException e) {
-            throw new BizException(500, "文件保存失败: " + e.getMessage());
+            log.error("文件保存失败: {}", targetPath, e);
+            throw new BizException(500, "文件保存失败");
         }
 
-        // 4. 创建数据库记录
+        boolean isAnonymous = (uploadedBy == null);
+
         KbDocument doc = KbDocument.builder()
                 .title(originalFilename)
                 .filePath(targetPath.toString())
@@ -69,32 +87,43 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
                 .chunkCount(0)
                 .status("PROCESSING")
                 .uploadedBy(uploadedBy)
+                .isTemporary(isAnonymous)
                 .build();
         save(doc);
 
-        // 5. 异步触发 RAG 处理管线：解析 → 切片 → Embedding → 入库
         CompletableFuture.runAsync(() -> ragService.addDocument(doc));
 
         return doc;
     }
 
-    /** 删除文档（同时删除物理文件，并异步重建向量索引） */
+    /** 删除文档（物理文件 + 数据库记录 + 向量库精确移除） */
     public void deleteDocument(Long id) {
         KbDocument doc = getById(id);
         if (doc == null) {
             throw new BizException(400, "文档不存在");
         }
-        // 删除物理文件
+
+        // 1. 精确移除向量（不再全量重建）
+        ragService.removeDocumentVectors(doc.getTitle());
+
+        // 2. 删除物理文件
         try {
             Files.deleteIfExists(Paths.get(doc.getFilePath()));
-        } catch (IOException ignored) {
-            // 文件不存在也不是大问题
+        } catch (IOException e) {
+            log.warn("物理文件删除失败: {}", doc.getFilePath(), e);
         }
-        // 删除数据库记录
-        removeById(id);
 
-        // 异步重建向量索引（全量重跑，确保一致性）
-        CompletableFuture.runAsync(() -> ragService.rebuildIndex());
+        // 3. 删除数据库记录
+        removeById(id);
+        log.info("文档 [{}] (id={}) 已删除", doc.getTitle(), id);
+    }
+
+    /** 重新处理单个文档（异步：清理旧向量 → 重新解析→切片→向量化→入库） */
+    public void reprocessDocument(KbDocument doc) {
+        doc.setStatus("PROCESSING");
+        doc.setChunkCount(0);
+        updateById(doc);
+        CompletableFuture.runAsync(() -> ragService.reprocessDocument(doc));
     }
 
     /** 更新文档处理状态 */
@@ -108,7 +137,39 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         updateById(doc);
     }
 
-    /** 根据文件扩展名判断类型 */
+    // ==================== 临时文档清理 ====================
+
+    /** 应用关闭时清理所有临时文档 */
+    @PreDestroy
+    public void onShutdown() {
+        log.info("应用关闭，清理临时文档...");
+        cleanTemporaryDocuments();
+    }
+
+    /** 清理所有匿名上传的临时文档 */
+    private void cleanTemporaryDocuments() {
+        List<KbDocument> tempDocs = lambdaQuery()
+                .eq(KbDocument::getIsTemporary, true)
+                .list();
+        if (tempDocs.isEmpty()) return;
+
+        log.info("清理 {} 个临时文档", tempDocs.size());
+        for (KbDocument doc : tempDocs) {
+            try {
+                Files.deleteIfExists(Paths.get(doc.getFilePath()));
+            } catch (IOException e) {
+                log.warn("临时文件删除失败: {}", doc.getFilePath());
+            }
+            removeById(doc.getId());
+        }
+        // 清理后重建索引
+        if (!tempDocs.isEmpty()) {
+            ragService.rebuildIndex();
+        }
+    }
+
+    // ==================== 内部方法 ====================
+
     private String getFileType(String filename) {
         String lower = filename.toLowerCase();
         if (lower.endsWith(".pdf")) return "pdf";

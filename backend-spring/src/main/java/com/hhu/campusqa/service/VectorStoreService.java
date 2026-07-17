@@ -42,6 +42,28 @@ public class VectorStoreService {
     }
 
     /**
+     * 按来源文档标题移除向量（单文档重处理前调用）
+     *
+     * @param source 文档标题
+     * @return 移除的切片数
+     */
+    public int removeBySource(String source) {
+        int removed = 0;
+        // 从后往前遍历，避免索引偏移
+        for (int i = chunks.size() - 1; i >= 0; i--) {
+            if (source.equals(chunks.get(i).getSource())) {
+                chunks.remove(i);
+                vectors.remove(i);
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            log.info("向量库移除文档 [{}] 的 {} 个切片，剩余: {}", source, removed, chunks.size());
+        }
+        return removed;
+    }
+
+    /**
      * 清空向量库（重建索引前调用）
      */
     public void clear() {

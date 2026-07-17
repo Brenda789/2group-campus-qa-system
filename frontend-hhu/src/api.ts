@@ -53,8 +53,8 @@ export const chatApi = {
 // ==================== 文档管理 ====================
 export const docApi = {
   /** 分页列表 → { records, total, current, size } */
-  list: (page = 1, size = 10) =>
-    request.get('/documents', { params: { page, size } }),
+  list: (page = 1, size = 10, keyword?: string, status?: string) =>
+    request.get('/documents', { params: { page, size, keyword, status } }),
 
   /** 上传文档 → FormData */
   upload: (file: File) => {
@@ -67,6 +67,9 @@ export const docApi = {
 
   /** 删除文档 */
   remove: (id: number) => request.delete(`/documents/${id}`),
+
+  /** 重新处理单个文档 */
+  reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
 }
 
 // ==================== 管理后台（Admin） ====================
