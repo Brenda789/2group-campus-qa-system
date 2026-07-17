@@ -44,10 +44,10 @@ export default function AdminLayout() {
   const menuItems = [
     { key: '/admin', icon: <DashboardOutlined />, label: '仪表盘' },
     { key: '/admin/chat', icon: <CommentOutlined />, label: '问答记录' },
+    { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
     ...(role === 'admin'
       ? [
           { key: '/admin/users', icon: <UserOutlined />, label: '用户管理' },
-          { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
         ]
       : []),
     { key: '/admin/profile', icon: <UserOutlined />, label: '个人管理' },

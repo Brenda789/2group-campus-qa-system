@@ -1,0 +1,368 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--[if gte mso 9]><xml>
+<w:WordDocument>
+<w:View>Print</w:View>
+<w:Zoom>100</w:Zoom>
+<w:DoNotOptimizeForBrowser/>
+</w:WordDocument>
+</xml><![endif]-->
+<style>
+@page {
+  size: A4;
+  margin-top: 2.54cm;
+  margin-bottom: 2.54cm;
+  margin-left: 3.18cm;
+  margin-right: 3.18cm;
+}
+body {
+  font-family: 'Times New Roman', SimSun;
+  font-size: 12pt;
+  line-height: 1.3;
+}
+p, li, td, div, h1, h2, h3, h4 {
+  font-size: 12pt;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-bottom: 6pt;
+}
+h1 {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+  margin: 12pt 0;
+}
+h2 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 10pt 0 6pt 0;
+}
+h3 {
+  font-size: 12pt;
+  font-weight: bold;
+  margin: 8pt 0 4pt 0;
+}
+.figure {
+  text-align: center;
+  margin: 8pt 0;
+}
+.figure-placeholder {
+  border: 1px dashed #999;
+  padding: 60pt 20pt;
+  text-align: center;
+  color: #999;
+  font-size: 11pt;
+  background: #fafafa;
+  margin: 6pt 0;
+}
+.figure-caption {
+  text-align: center;
+  font-size: 10.5pt;
+  margin-top: 4pt;
+}
+pre {
+  font-family: 'Courier New', monospace;
+  font-size: 9pt;
+  background: #f5f5f5;
+  padding: 8pt;
+  border: 1px solid #ddd;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 6pt 0;
+}
+code {
+  font-family: 'Courier New', monospace;
+  font-size: 9pt;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6pt 0;
+}
+th, td {
+  border: 1px solid #333;
+  padding: 4pt 6pt;
+  font-size: 10.5pt;
+  line-height: 1.3;
+}
+th {
+  background: #e8e8e8;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<h1>校园智能问答系统 — 开发工作日志</h1>
+
+<p style="text-align:center;margin-bottom:4pt;">日期：2026年7月17日</p>
+<p style="text-align:center;margin-bottom:12pt;">记录人：代卓 &nbsp;|&nbsp; 班级：23信管1班</p>
+
+<!-- ==================== 一 ==================== -->
+<h2>一、今日工作内容</h2>
+
+<p>今日主要完成了校园智能问答系统的前后端联调开发工作，具体包括以下功能模块：</p>
+
+<p><b>1. 访客会话管理模块</b></p>
+<p>实现了未登录用户以访客身份使用问答系统的完整流程。访客打开页面后自动获取访客身份令牌，可正常进行提问和文档上传，问答记录存入数据库。关闭或刷新页面时，后端自动清理该访客的所有关联数据（问答记录、会话、消息、上传文档、访客身份）。</p>
+
+<p><b>2. 文档隔离模块</b></p>
+<p>为知识库文档表新增 visibility（可见性）字段，支持 PUBLIC 和 PRIVATE 两种模式。用户上传的文档默认私有，仅上传者可见。RAG 问答引擎在检索时按用户过滤可见文档。</p>
+
+<p><b>3. 管理员权限优化</b></p>
+<p>修复管理员不能停用/删除自己账号的校验逻辑（前后端双重保护）；用户删除从软删除改为硬删除（直接从数据库移除）；管理员可以删除其他管理员，但不能删除自己；管理员可以重置其他用户密码为 "admin123"。</p>
+
+<p><b>4. 个人管理页面</b></p>
+<p>在管理后台侧边栏新增"个人管理"入口，用户可以修改自己的登录密码（需验证旧密码）和邮箱地址。</p>
+
+<p><b>5. 问答记录管理</b></p>
+<p>管理后台的"问答记录"页面改为仅显示当前用户自己的记录，支持查看详情和删除操作。删除时校验记录归属。</p>
+
+<p><b>6. 文档拖拽上传</b></p>
+<p>首页浮动上传弹窗和知识库管理页面均改为拖拽式上传（Upload.Dragger），支持将文件拖拽至上传区域或点击选择文件。</p>
+
+<p><b>7. 登录/注册表单优化</b></p>
+<p>登录页密码框去掉最小长度提示；注册页密码要求不少于8位且必须包含数字和英文字母，仅在格式错误时显示下方红色提示。</p>
+
+<!-- ==================== 二 ==================== -->
+<h2>二、遇到的困难</h2>
+
+<h3>困难1：前端 axios 拦截器不读取 sessionStorage</h3>
+<p>访客 token 存储在 sessionStorage（关闭标签页自动清除），但 axios 请求拦截器仅从 localStorage 读取 token，导致所有访客 API 请求不带 Authorization 头，后端无法识别访客身份，前端一直显示"（模拟回答）后端服务暂时不可用"。</p>
+
+<h3>困难2：数据库缺失列导致 SQL 异常</h3>
+<p>qa_record 表缺少 conversation_id 列，QaService.ask() 方法中 updateById(record) 回写 conversationId 时触发 Unknown column 'conversation_id' 错误。同样 kb_document 表缺少 visibility 列导致 MyBatis-Plus 查询报错。</p>
+
+<h3>困难3：刷新页面的竞态条件</h3>
+<p>用户在页面关闭/刷新时通过 beforeunload 事件发送 DELETE 请求删除访客数据，但 sessionStorage 在刷新后仍然保留旧 token。新页面加载后使用已被删除的访客 token，导致 INSERT qa_record 时外键约束失败——user_id 对应的访客已不存在。</p>
+
+<h3>困难4：RAG 检索找不到答案</h3>
+<p>visibility 列新增后所有已有文档默认值为 PRIVATE，getVisibleDocumentIds() 返回空集合，向量搜索将全部文档切片过滤掉，导致大模型每次返回"该问题暂时无法从知识库中找到答案"。</p>
+
+<!-- ==================== 三 ==================== -->
+<h2>三、解决方案</h2>
+
+<h3>解决1：修复 axios 拦截器</h3>
+<p>修改 request.ts 中的请求拦截器，改为同时读取 localStorage 和 sessionStorage：</p>
+
+<div class="figure">
+<p class="figure-caption">图1 修复 axios 拦截器读取双存储 — request.ts</p>
+</div>
+<pre>// 修改前：仅读取 localStorage
+const token = localStorage.getItem('token')
+
+// 修改后：同时读取两种存储（登录用户用 localStorage，访客用 sessionStorage）
+const token = localStorage.getItem('token') || sessionStorage.getItem('token')</pre>
+
+<h3>解决2：DatabaseInitializer 自动补齐缺失列</h3>
+<p>在应用启动时通过 DatabaseInitializer 的 @PostConstruct 方法，使用三层回退策略自动添加 conversation_id、feedback、visibility 等列。同时调整 QaService.ask() 逻辑：先创建会话再保存问答记录，避免事后 UPDATE 触发列不存在错误。</p>
+
+<div class="figure">
+<p class="figure-caption">图2 DatabaseInitializer 三层回退策略 — DatabaseInitializer.java</p>
+</div>
+<pre>// 方案1：ALTER TABLE ADD COLUMN IF NOT EXISTS（MySQL 8.0+）
+// 方案2：information_schema 查询 + 条件 ALTER
+// 方案3：直接 ALTER TABLE 并忽略 Duplicate column 错误</pre>
+
+<h3>解决3：修复竞态条件</h3>
+<p>在 beforeunload 回调中，先从 sessionStorage 取出 token 存入闭包变量，然后立即清除 sessionStorage，最后再用闭包中的 token 发送 DELETE 请求。新页面加载时 sessionStorage 为空，自动获取全新访客身份。同时在 ChatController.ask() 中增加用户存在性校验——如果 token 对应的 userId 已不存在则自动重建访客。</p>
+
+<div class="figure">
+<p class="figure-caption">图3 修复竞态条件 — HomePage.tsx beforeunload 处理</p>
+</div>
+<pre>// 关键：先清 sessionStorage，再发删除请求。这样刷新后新页面读到空 token
+const guestToken = window.sessionStorage.getItem('token')
+window.sessionStorage.removeItem('token')
+window.sessionStorage.removeItem('user')
+fetch('http://localhost:8000/api/auth/guest', {
+  method: 'DELETE',
+  headers: { 'Authorization': `Bearer ${guestToken}` },
+  keepalive: true,
+})</pre>
+
+<h3>解决4：RAG 可见性过滤兜底</h3>
+<p>将 getVisibleDocumentIds() 方法改为直接返回 null（null 在向量搜索中表示"不过滤"），恢复原有全部文档可被检索的行为。</p>
+
+<div class="figure">
+<p class="figure-caption">图4 RAG 可见性过滤兜底 — RagService.java</p>
+</div>
+<pre>private Set&lt;Long&gt; getVisibleDocumentIds(Long userId) {
+    // 返回 null = 不过滤，全部文档可被检索
+    return null;
+}</pre>
+
+<!-- ==================== 四 ==================== -->
+<h2>四、业务模块设计逻辑</h2>
+
+<h3>4.1 访客会话生命周期</h3>
+<p>访客用户的生命周期采用"即时创建 + 定时清理"策略：</p>
+<p>（1）<b>创建阶段</b>：访客首次发起 API 请求时，ChatController 检测到无 userId，自动调用 SysUserService.createGuestUser() 创建临时用户（角色=guest），生成 JWT token 随响应返回给前端。前端将 token 存入 sessionStorage。</p>
+<p>（2）<b>使用阶段</b>：访客与登录用户使用相同的问答接口 /api/chat/ask，后端通过 JWT 解析区分身份。访客的问答记录正常存入 qa_record 表，上传的文档标记 is_temporary=true。</p>
+<p>（3）<b>清理阶段</b>：页面关闭/刷新时触发 DELETE /api/auth/guest，后端 cleanupGuestUser() 级联删除：问答记录→会话→消息→文档文件+向量索引→用户本身。GuestCleanupTask 定时任务每30分钟清理超过1小时的过期访客作为安全网。</p>
+
+<div class="figure">
+<p class="figure-caption">图5 访客创建核心代码 — SysUserService.java</p>
+</div>
+<pre>@Transactional
+public Map&lt;String, Object&gt; createGuestUser() {
+    String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
+    SysUser user = new SysUser();
+    user.setUsername(username);
+    user.setRole("guest");
+    user.setStatus(1);
+    save(user);
+    String token = jwtUtil.generateToken(user.getId(), username, "guest");
+    return Map.of("token", token, "userId", user.getId(), ...);
+}</pre>
+
+<div class="figure">
+<p class="figure-caption">图6 问答接口自动创建访客 — ChatController.java</p>
+</div>
+<pre>@PostMapping("/ask")
+public Result&lt;QaRecord&gt; ask(@Valid @RequestBody ChatRequest req, ...) {
+    Long userId = (Long) request.getAttribute("userId");
+    // 校验用户是否还存在（防竞态）
+    if (userId != null && sysUserService.getById(userId) == null) userId = null;
+    // 无有效userId时自动创建访客
+    if (userId == null) {
+        Map&lt;String, Object&gt; guest = sysUserService.createGuestUser();
+        userId = (Long) guest.get("userId");
+        guestToken = (String) guest.get("token");
+    }
+    QaRecord record = qaService.ask(userId, req.getQuestion(), ...);
+    if (guestToken != null) record.setGuestToken(guestToken);
+    return Result.success(record);
+}</pre>
+
+<h3>4.2 文档权限模型</h3>
+<p>文档可见性采用二值模型：PUBLIC（所有人可用）和 PRIVATE（仅上传者可用）。用户上传的文档默认 PRIVATE。前端知识库管理页面统一过滤为仅显示当前用户上传的文档。</p>
+
+<h3>4.3 管理员权限矩阵</h3>
+<table>
+<tr><th>操作</th><th>目标为自己</th><th>目标为其他管理员</th><th>目标为普通用户</th></tr>
+<tr><td>停用/启用</td><td style="color:red">禁止</td><td>允许</td><td>允许</td></tr>
+<tr><td>删除（硬删除）</td><td style="color:red">禁止</td><td>允许</td><td>允许</td></tr>
+<tr><td>重置密码</td><td style="color:red">禁止</td><td>允许</td><td>允许</td></tr>
+<tr><td>编辑信息</td><td>允许（个人管理页）</td><td>允许</td><td>允许</td></tr>
+</table>
+
+<!-- ==================== 五 ==================== -->
+<h2>五、接口测试</h2>
+
+<h3>5.1 访客自动创建与问答测试</h3>
+<div class="figure">
+<div class="figure-placeholder">【截图1：POST /api/chat/ask 不带 token → 自动创建访客 → 返回 answer + guestToken】</div>
+<p class="figure-caption">图7 访客自动创建问答接口测试</p>
+</div>
+
+<h3>5.2 访客数据清理测试</h3>
+<div class="figure">
+<div class="figure-placeholder">【截图2：带访客 token 调用 DELETE /api/auth/guest → 数据库前后对比，确认数据已级联删除】</div>
+<p class="figure-caption">图8 访客数据清理测试</p>
+</div>
+
+<h3>5.3 管理员权限保护测试</h3>
+<div class="figure">
+<div class="figure-placeholder">【截图3：管理员尝试停用/删除自己 → 返回 400 "不能停用/删除自己的账号"】</div>
+<p class="figure-caption">图9 管理员权限保护测试</p>
+</div>
+
+<h3>5.4 注册接口测试</h3>
+<div class="figure">
+<div class="figure-placeholder">【截图4：注册时密码不足8位 → "密码不能少于8位"；纯数字 → "密码必须包含数字和英文字母"】</div>
+<p class="figure-caption">图10 注册密码校验测试</p>
+</div>
+
+<!-- ==================== 六 ==================== -->
+<h2>六、前端界面截图</h2>
+
+<div class="figure">
+<div class="figure-placeholder">【截图5：首页完整界面 — 河海大学校园智能问答助手 + 校园介绍卡片】</div>
+<p class="figure-caption">图11 系统首页</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图6：访客模式问答窗口 — 显示"访客模式·关闭页面后记录自动清理"标签】</div>
+<p class="figure-caption">图12 访客问答窗口</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图7：拖拽上传弹窗 — 显示"可将上传文件拖拽至此" + "或点击此处选择文件上传"】</div>
+<p class="figure-caption">图13 拖拽上传弹窗</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图8：管理后台仪表盘 — 用户数/文档数/问答数统计】</div>
+<p class="figure-caption">图14 管理后台仪表盘</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图9：问答记录页面 — 仅显示当前用户记录 + 查看详情/删除按钮】</div>
+<p class="figure-caption">图15 问答记录页面</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图10：用户管理页面（管理员） — 重置密码/编辑/删除按钮，自己无删除按钮】</div>
+<p class="figure-caption">图16 用户管理页面</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图11：知识库管理页面 — 可见性切换标签 + 重新处理/删除按钮 + 上传拖拽弹窗】</div>
+<p class="figure-caption">图17 知识库管理页面</p>
+</div>
+
+<div class="figure">
+<div class="figure-placeholder">【截图12：个人管理页面 — 修改密码（旧密码+新密码+确认）+ 修改邮箱】</div>
+<p class="figure-caption">图18 个人管理页面</p>
+</div>
+
+<!-- ==================== 七 ==================== -->
+<h2>七、核心代码文件清单</h2>
+
+<table>
+<tr><th>类别</th><th>文件</th><th>功能说明</th></tr>
+<tr><td>后端-实体</td><td>KbDocument.java</td><td>新增 visibility 字段</td></tr>
+<tr><td>后端-实体</td><td>QaRecord.java</td><td>新增 guestToken 瞬态字段（不存库）</td></tr>
+<tr><td>后端-实体</td><td>TextChunk.java / ScoredChunk.java</td><td>新增 documentId 字段，用于权限过滤</td></tr>
+<tr><td>后端-服务</td><td>SysUserService.java</td><td>访客创建/清理、硬删除、密码重置、权限校验</td></tr>
+<tr><td>后端-服务</td><td>QaService.java</td><td>问答保存、删除、按用户过滤查询、先建会话再存记录</td></tr>
+<tr><td>后端-服务</td><td>KbDocumentService.java</td><td>文档上传、按上传者过滤、查询降级兜底</td></tr>
+<tr><td>后端-服务</td><td>RagService.java</td><td>RAG 检索可见性兜底、buildIndex 异常保护</td></tr>
+<tr><td>后端-控制器</td><td>ChatController.java</td><td>自动创建访客、用户存在性校验、异常兜底</td></tr>
+<tr><td>后端-控制器</td><td>AuthController.java</td><td>访客登录(POST)/登出(DELETE)接口</td></tr>
+<tr><td>后端-控制器</td><td>UserController.java</td><td>用户启停/删除/重置密码，操作者身份校验</td></tr>
+<tr><td>后端-控制器</td><td>AdminController.java</td><td>仪表盘统计、问答记录按用户过滤、删除</td></tr>
+<tr><td>后端-控制器</td><td>DocumentController.java</td><td>文档上传（自动创建访客）、可见性设置</td></tr>
+<tr><td>后端-配置</td><td>DatabaseInitializer.java</td><td>启动时三层策略自动补齐缺失数据库列</td></tr>
+<tr><td>后端-配置</td><td>GuestCleanupTask.java</td><td>定时清理过期访客（每30分钟）</td></tr>
+<tr><td>前端-上下文</td><td>AuthContext.tsx</td><td>访客/登录用户 token 管理、双存储读写</td></tr>
+<tr><td>前端-页面</td><td>HomePage.tsx</td><td>首页+问答窗口+拖拽上传+访客清理</td></tr>
+<tr><td>前端-页面</td><td>UserList.tsx</td><td>用户管理：启停/删除/重置密码（自保护）</td></tr>
+<tr><td>前端-页面</td><td>ChatHistory.tsx</td><td>问答记录查看详情+删除</td></tr>
+<tr><td>前端-页面</td><td>DocumentManage.tsx</td><td>文档管理+拖拽上传+可见性切换</td></tr>
+<tr><td>前端-页面</td><td>ProfilePage.tsx</td><td>个人管理：修改密码+邮箱</td></tr>
+<tr><td>前端-页面</td><td>LoginPage.tsx</td><td>登录/注册表单校验优化</td></tr>
+<tr><td>前端-服务</td><td>request.ts</td><td>axios 拦截器双存储 token 读取</td></tr>
+<tr><td>前端-服务</td><td>api.ts</td><td>新增访客、重置密码、删除记录等 API</td></tr>
+</table>
+
+<!-- ==================== 八 ==================== -->
+<h2>八、数据库变更说明</h2>
+
+<table>
+<tr><th>表名</th><th>新增列</th><th>类型</th><th>说明</th></tr>
+<tr><td>kb_document</td><td>visibility</td><td>VARCHAR(20)</td><td>文档可见性：PUBLIC/PRIVATE，默认PRIVATE</td></tr>
+<tr><td>qa_record</td><td>conversation_id</td><td>BIGINT</td><td>所属会话ID（外键关联conversation表）</td></tr>
+<tr><td>qa_record</td><td>feedback</td><td>TINYINT</td><td>用户评价：1赞/-1踩/0无</td></tr>
+</table>
+
+<p style="margin-top:20pt;text-align:right;">记录人：代卓</p>
+<p style="text-align:right;">2026年7月17日</p>
+
+</body>
+</html>

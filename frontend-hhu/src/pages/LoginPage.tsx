@@ -214,7 +214,11 @@ export default function LoginPage() {
                   <Form.Item name="email" rules={[{ type: 'email', message: '请输入合法邮箱' }]}>
                     <Input prefix={<MailOutlined />} placeholder="邮箱" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, min: 6, message: '密码长度需大于6位' }]}>
+                  <Form.Item name="password" rules={[
+                    { required: true, message: '请输入密码' },
+                    { min: 8, message: '密码不能少于8位' },
+                    { pattern: /^(?=.*[a-zA-Z])(?=.*\d)/, message: '密码必须包含数字和英文字母' },
+                  ]}>
                     <Input.Password prefix={<LockOutlined />} placeholder="密码" />
                   </Form.Item>
                   <Form.Item name="confirm" dependencies={['password']} rules={[{ required: true, message: '请确认密码' }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('password') === value) return Promise.resolve(); return Promise.reject(new Error('两次输入密码不一致')) } })]}>

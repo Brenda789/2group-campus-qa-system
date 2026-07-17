@@ -43,8 +43,8 @@ public class UserController {
         if (username == null || username.isBlank()) {
             throw new BizException(400, "用户名不能为空");
         }
-        if (password == null || password.length() < 6) {
-            throw new BizException(400, "密码至少6位");
+        if (password == null || password.length() < 8) {
+            throw new BizException(400, "密码不能少于8位");
         }
         return Result.success(sysUserService.createUser(username, password, email, role));
     }

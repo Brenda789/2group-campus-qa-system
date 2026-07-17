@@ -170,8 +170,8 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         if (oldPassword.equals(newPassword)) {
             throw new BizException(400, "新密码不能与旧密码相同");
         }
-        if (newPassword.length() < 6 || newPassword.length() > 20) {
-            throw new BizException(400, "新密码长度需在6-20位之间");
+        if (newPassword.length() < 8 || newPassword.length() > 20) {
+            throw new BizException(400, "新密码不能少于8位");
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         updateById(user);
