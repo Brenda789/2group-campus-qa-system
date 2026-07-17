@@ -23,26 +23,6 @@ export const authApi = {
    */
   register: (username: string, password: string, email: string) =>
     request.post('/auth/register', { username, password, email }),
-
-  /** 访客登录 → 自动创建访客账号，返回 { token, username, role, userId } */
-  guestLogin: () => request.post('/auth/guest'),
-
-  /** 访客登出 → 清理访客数据（页面关闭时调用） */
-  guestLogout: () => request.delete('/auth/guest'),
-}
-
-// ==================== 个人管理 ====================
-export const profileApi = {
-  /** 修改密码 */
-  changePassword: (oldPassword: string, newPassword: string) =>
-    request.put('/user/password', { oldPassword, newPassword }),
-
-  /** 修改个人信息（邮箱） */
-  updateProfile: (email: string) =>
-    request.put('/user/profile', { email }),
-
-  /** 获取当前用户信息 */
-  me: () => request.get('/user/me'),
 }
 
 // ==================== 用户管理 ====================
@@ -64,15 +44,10 @@ export const userApi = {
   toggleStatus: (userId: number, status: number) =>
     request.put(`/user/${userId}/status`, { status }),
 
-  /** 删除用户（硬删除）
+  /** 删除用户（软删除）
    *  不设 mock 降级——写操作必须透传后端错误。 */
   remove: (userId: number) =>
     request.delete(`/user/${userId}`),
-
-  /** 管理员重置用户密码为 admin123
-   *  不设 mock 降级——写操作必须透传后端错误。 */
-  resetPassword: (userId: number) =>
-    request.put(`/user/${userId}/reset-password`),
 
   /** 编辑用户信息（邮箱、角色）
    *  不设 mock 降级——写操作必须透传后端错误。 */
@@ -90,8 +65,8 @@ export const userApi = {
 export const chatApi = {
   /** 提问 → QaRecord */
   ask: (question: string, conversationId?: number) =>
-    request.post('/chat/ask', { question, conversationId }).catch((err: any) => {
-      console.error('chat ask 失败:', err?.message || err, err?.response?.data || '')
+    request.post('/chat/ask', { question, conversationId }).catch(() => {
+      console.warn(`${MOCK_PREFIX} chat ask fallback`)
       return {
         id: Date.now(),
         question,
@@ -124,6 +99,80 @@ export const chatApi = {
    *  不设 mock 降级——写操作必须透传后端错误。 */
   deleteConversation: (convId: number) =>
     request.delete(`/chat/conversations/${convId}`),
+
+  /**
+   * 流式提问（SSE 打字机效果）
+   *
+   * 通过 fetch + ReadableStream 消费 SSE 流，每收到一个 token 调用 onToken，
+   * 流结束后调用 onDone，出错调用 onError。
+   *
+   * @returns 取消函数（调用后中断请求）
+   */
+  streamAsk: (
+    question: string,
+    conversationId: number | undefined,
+    onToken: (text: string) => void,
+    onDone: (fullAnswer: string, conversationId?: number) => void,
+    onError: (err: string) => void,
+  ) => {
+    const controller = new AbortController()
+    const token = localStorage.getItem('token')
+    const baseUrl = 'http://localhost:8000/api'
+
+    fetch(`${baseUrl}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question, conversationId }),
+      signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        onError(`请求失败 (${res.status})`)
+        return
+      }
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let full = ''
+      let buffer = ''
+      let resolvedConvId: number | undefined = conversationId
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // 按行解析 SSE
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留不完整行
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6)
+
+          // 会话 ID 标记
+          if (data.startsWith('__CONV__')) {
+            const convIdStr = data.slice(8)
+            if (convIdStr && convIdStr !== 'new') {
+              resolvedConvId = Number(convIdStr)
+            }
+            continue
+          }
+
+          full += data
+          onToken(data)
+        }
+      }
+      onDone(full, resolvedConvId)
+    }).catch((err) => {
+      if (err.name !== 'AbortError') {
+        onError(err.message)
+      }
+    })
+
+    return () => controller.abort()
+  },
 }
 
 // ==================== 文档管理 ====================
@@ -152,9 +201,12 @@ export const docApi = {
   /** 重新处理单个文档 */
   reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
 
-  /** 修改文档可见性（仅管理员） */
-  setVisibility: (id: number, visibility: 'PUBLIC' | 'PRIVATE') =>
-    request.put(`/documents/${id}/visibility`, { visibility }),
+  /** 查询单个文档（用于轮询处理状态） */
+  getById: (id: number) =>
+    request.get(`/documents/${id}`).catch(() => {
+      console.warn(`${MOCK_PREFIX} doc getById fallback id=${id}`)
+      return null
+    }),
 }
 
 // ==================== 管理后台（Admin） ====================
@@ -176,9 +228,6 @@ export const adminApi = {
       console.warn(`${MOCK_PREFIX} admin chatDetail fallback id=${id}`)
       throw new Error('后端未连接，无法查看详情')
     }),
-
-  /** 删除自己的问答记录 */
-  deleteChat: (id: number) => request.delete(`/admin/chat/${id}`),
 
   /** 重建向量索引
    *  不设 mock 降级——写操作必须透传后端错误。 */

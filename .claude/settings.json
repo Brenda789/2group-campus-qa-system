@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process -Id 30300 -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

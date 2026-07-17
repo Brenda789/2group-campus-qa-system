@@ -7,84 +7,107 @@ import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
 import com.hhu.campusqa.service.RagService;
-import com.hhu.campusqa.service.SysUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 问答接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
 
     private final QaService qaService;
     private final RagService ragService;
-    private final SysUserService sysUserService;
 
-    public ChatController(QaService qaService, RagService ragService, SysUserService sysUserService) {
+    public ChatController(QaService qaService, RagService ragService) {
         this.qaService = qaService;
         this.ragService = ragService;
-        this.sysUserService = sysUserService;
     }
 
-    /** 提问（RAG 引擎，一次性返回；无 token 或 token 对应的用户已被清理时自动创建访客） */
+    /** 提问（RAG 引擎，一次性返回；支持匿名） */
     @PostMapping("/ask")
     public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        String guestToken = null;
-
-        try {
-            // 校验 token 对应的用户是否还存在（刷新页面时可能被 beforeunload 清理了）
-            if (userId != null) {
-                try {
-                    if (sysUserService.getById(userId) == null) {
-                        userId = null; // 用户已被删除，重新创建访客
-                    }
-                } catch (Exception ignored) {
-                    userId = null;
-                }
-            }
-
-            // 如果没有有效 userId，自动创建访客
-            if (userId == null) {
-                Map<String, Object> guest = sysUserService.createGuestUser();
-                userId = (Long) guest.get("userId");
-                guestToken = (String) guest.get("token");
-            }
-
-            QaRecord record = qaService.ask(userId, req.getQuestion(), req.getConversationId());
-            if (guestToken != null) {
-                record.setGuestToken(guestToken);
-            }
-            return Result.success(record);
-        } catch (Exception e) {
-            QaRecord fallback = new QaRecord();
-            fallback.setQuestion(req.getQuestion());
-            fallback.setAnswer("知识库暂时不可用，请稍后重试。错误：" + e.getMessage());
-            fallback.setSourceDocs("[]");
-            if (guestToken != null) {
-                fallback.setGuestToken(guestToken);
-            }
-            return Result.success(fallback);
-        }
+        return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
     }
 
-    /** 流式提问（SSE 打字机效果） */
+    /** 流式提问（SSE 打字机效果；支持匿名） */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
+    public ResponseEntity<StreamingResponseBody> streamAsk(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
         Long userId = (Long) request.getAttribute("userId");
-        ragService.streamAnswer(req.getQuestion(), userId, emitter);
-        return emitter;
+
+        StreamingResponseBody body = outputStream -> {
+            PrintWriter writer = new PrintWriter(
+                    new OutputStreamWriter(outputStream, StandardCharsets.UTF_8), true);
+
+            // 登录用户：先创建会话，发送 convId 给前端
+            final Long[] convIdHolder = new Long[1];
+            if (userId != null) {
+                // 使用前端传来的 conversationId，否则创建新会话
+                if (req.getConversationId() != null) {
+                    convIdHolder[0] = req.getConversationId();
+                }
+                // 新会话由 saveStreamQa 自动创建，这里先发送占位
+                writer.write("data: __CONV__" +
+                        (convIdHolder[0] != null ? convIdHolder[0] : "new") + "\n\n");
+                writer.flush();
+            }
+
+            CountDownLatch latch = new CountDownLatch(1);
+
+            if (userId == null) {
+                // 匿名：只推送答案，不存库
+                ragService.streamAnswer(req.getQuestion(), writer, result -> latch.countDown());
+            } else {
+                // 登录用户：推送答案 + 完成后异步存库
+                final String question = req.getQuestion();
+                ragService.streamAnswer(req.getQuestion(), writer, result -> {
+                    // 异步保存，不阻塞 SSE 流关闭
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            Long savedConvId = qaService.saveStreamQa(
+                                    userId, convIdHolder[0], question,
+                                    result.answer(), result.sources());
+                            log.info("流式问答已保存: convId={}", savedConvId);
+                        } catch (Exception e) {
+                            log.error("保存流式问答记录失败", e);
+                        }
+                    });
+                    latch.countDown();
+                });
+            }
+
+            try {
+                boolean ok = latch.await(5, TimeUnit.MINUTES);
+                if (!ok) {
+                    log.warn("流式问答超时 (5分钟)");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .body(body);
     }
 
     /** 问答历史（qa_record 汇总，支持关键词搜索） */

@@ -111,6 +111,16 @@ public class DocumentController {
         return Result.success();
     }
 
+    /** 查询单个文档（用于轮询处理状态） */
+    @GetMapping("/{id}")
+    public Result<KbDocument> getById(@PathVariable Long id) {
+        KbDocument doc = kbDocumentService.getById(id);
+        if (doc == null) {
+            throw new BizException(404, "文档不存在");
+        }
+        return Result.success(doc);
+    }
+
     /** 重新处理单个文档（仅管理员） */
     @PostMapping("/{id}/reprocess")
     public Result<KbDocument> reprocess(@PathVariable Long id, HttpServletRequest request) {
