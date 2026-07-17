@@ -36,7 +36,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
 
     // ==================== 注册 ====================
 
-    /** 注册新用户 */
+    /** 注册新用户（公开注册，密码已由 AuthController RSA 解密） */
     public Long register(RegisterRequest dto) {
         // 检查用户名是否已存在
         Long exist = lambdaQuery()
@@ -52,6 +52,33 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         user.setRole("user");
         user.setStatus(1);
         save(user);  // MyBatis-Plus 自动填充 createTime
+        return user.getId();
+    }
+
+    /** 管理员创建用户（明文密码，不走 RSA，直接 BCrypt） */
+    public Long createUser(String username, String password, String email, String role) {
+        Long exist = lambdaQuery()
+                .eq(SysUser::getUsername, username)
+                .count();
+        if (exist > 0) {
+            throw new BizException(400, "用户名已存在");
+        }
+
+        SysUser user = new SysUser();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setEmail(email != null ? email : "");
+        if (role != null && !role.isEmpty()) {
+            String normalized = role.toLowerCase();
+            if (!"admin".equals(normalized) && !"user".equals(normalized)) {
+                throw new BizException(400, "角色值无效，需为 admin 或 user");
+            }
+            user.setRole(normalized);
+        } else {
+            user.setRole("user");
+        }
+        user.setStatus(1);
+        save(user);
         return user.getId();
     }
 
@@ -115,6 +142,26 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
             throw new BizException(400, "新密码长度需在6-20位之间");
         }
         user.setPassword(passwordEncoder.encode(newPassword));
+        updateById(user);
+    }
+
+    /** 编辑用户信息（邮箱、角色），用户名不可改 */
+    public void updateUser(Long id, String email, String role) {
+        SysUser user = getById(id);
+        if (user == null) {
+            throw new BizException(400, "用户不存在");
+        }
+        if (email != null) {
+            user.setEmail(email);
+        }
+        if (role != null) {
+            // 归一化为小写
+            String normalized = role.toLowerCase();
+            if (!"admin".equals(normalized) && !"user".equals(normalized)) {
+                throw new BizException(400, "角色值无效，需为 admin 或 user");
+            }
+            user.setRole(normalized);
+        }
         updateById(user);
     }
 

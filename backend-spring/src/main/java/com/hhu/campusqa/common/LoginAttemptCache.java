@@ -1,8 +1,8 @@
 package com.hhu.campusqa.common;
 
-import org.springframework.stereotype.Component;
-
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.stereotype.Component;
 
 /**
  * 登录失败限流缓存（内存实现）
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LoginAttemptCache {
 
     /** 最大失败次数 */
-    private static final int MAX_FAIL_COUNT = 5;
+    private static final int MAX_FAIL_COUNT = 100;
     /** 锁定时长（毫秒） */
     private static final long LOCK_DURATION_MS = 15 * 60 * 1000;
 

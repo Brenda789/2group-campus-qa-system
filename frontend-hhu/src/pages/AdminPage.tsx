@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout'
+import { getToken } from '../types'
 
 /**
  * 管理后台入口
@@ -9,12 +9,11 @@ import AdminLayout from '../components/AdminLayout'
  * AdminLayout 提供侧边栏 + 顶栏壳，子页面通过 <Outlet /> 渲染。
  */
 export default function AdminPage() {
-  const navigate = useNavigate()
-  const token = localStorage.getItem('token')
+  const token = getToken()
 
-  useEffect(() => {
-    if (!token) navigate('/login')
-  }, [token, navigate])
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
 
   return <AdminLayout />
 }

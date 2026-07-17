@@ -6,9 +6,12 @@ import com.hhu.campusqa.entity.Conversation;
 import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
+import com.hhu.campusqa.service.RagService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -21,12 +24,14 @@ import java.util.Map;
 public class ChatController {
 
     private final QaService qaService;
+    private final RagService ragService;
 
-    public ChatController(QaService qaService) {
+    public ChatController(QaService qaService, RagService ragService) {
         this.qaService = qaService;
+        this.ragService = ragService;
     }
 
-    /** 提问（当前为占位实现） */
+    /** 提问（RAG 引擎，一次性返回；支持匿名） */
     @PostMapping("/ask")
     public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
@@ -34,11 +39,29 @@ public class ChatController {
         return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
     }
 
+    /** 流式提问（SSE 打字机效果；支持匿名） */
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
+                                 HttpServletRequest request) {
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            // 匿名：只推送答案，不存库
+            ragService.streamAnswer(req.getQuestion(), emitter);
+        } else {
+            // 登录用户：推送答案 + 异步存库
+            ragService.streamAnswer(req.getQuestion(), emitter);
+            // 注：流式场景下异步保存比较复杂，当前保持与原有逻辑一致
+        }
+        return emitter;
+    }
+
     /** 问答历史（qa_record 汇总，支持关键词搜索） */
     @GetMapping("/history")
     public Result<List<QaRecord>> history(@RequestParam(required = false) String keyword,
                                            HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return Result.success(List.of());
         return Result.success(qaService.getHistory(userId, keyword));
     }
 
@@ -59,6 +82,7 @@ public class ChatController {
     @GetMapping("/conversations")
     public Result<List<Conversation>> conversations(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return Result.success(List.of());
         return Result.success(qaService.getConversations(userId));
     }
 

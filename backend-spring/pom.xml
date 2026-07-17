@@ -85,6 +85,30 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- ========== 文档解析（PDF / DOCX） ========== -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
+        <!-- ========== JSON 序列化（ObjectMapper） ========== -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- ========== WebClient（调用 DashScope API） ========== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
         <!-- ========== 热重载（开发用） ========== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

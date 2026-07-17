@@ -31,6 +31,36 @@ public class UserController {
         return Result.success(sysUserService.pageUsers(page, size, keyword));
     }
 
+    /** 管理员创建用户（明文密码，不走 RSA 解密） */
+    @PostMapping
+    public Result<Long> createUser(@RequestBody Map<String, String> body,
+                                  HttpServletRequest request) {
+        checkAdmin(request);
+        String username = body.get("username");
+        String password = body.get("password");
+        String email = body.get("email");
+        String role = body.get("role");
+        if (username == null || username.isBlank()) {
+            throw new BizException(400, "用户名不能为空");
+        }
+        if (password == null || password.length() < 6) {
+            throw new BizException(400, "密码至少6位");
+        }
+        return Result.success(sysUserService.createUser(username, password, email, role));
+    }
+
+    /** 编辑用户（邮箱、角色） */
+    @PutMapping("/{id}")
+    public Result<Void> updateUser(@PathVariable Long id,
+                                  @RequestBody Map<String, String> body,
+                                  HttpServletRequest request) {
+        checkAdmin(request);
+        String email = body.get("email");
+        String role = body.get("role");
+        sysUserService.updateUser(id, email, role);
+        return Result.success();
+    }
+
     /** 启停用户 */
     @PutMapping("/{id}/status")
     public Result<Void> toggleStatus(@PathVariable Long id,

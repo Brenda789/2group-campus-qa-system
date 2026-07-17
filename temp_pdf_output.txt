@@ -1,0 +1,852 @@
+C A M P U S   Q A   A S S I S T A N T   P R O J E C T
+
+校园问答助手开发项目
+
+Day 2 · 基础功能开发业务流程 · 后端接口 · 用户模块 · 登录认证 · 前端实现v1.0 | 2026实训课程T A B L E   O F   C O N T E N T S
+
+今日课程导览
+
+业务流程与流程图
+
+后端服务与用户模块
+
+实体 /Mapper 、 CRUD 接口、注册校验与加密
+
+登录认证与权限控制
+
+前端页面开发
+
+JWT 、登录接口、 Token 拦截器与权限控制
+
+Axios 封装、登录页与用户管理 Table
+
+02
+
+01流程图、分层架构、统一响应与全局异常02030401
+
+业务流程与架构设计
+
+系统流程、 RAG 流程、分层架构与统一响应
+
+系统流程图绘制
+
+系统整体流程
+
+注册 / 登录 → 上传文档 → 文档处理
+
+→ 发起提问 →  RAG 检索 →  AI 回答 → 展示
+
+流程图工具
+
+ProcessOn / Draw.io / Visio
+
+核 心 业 务 流 程 ： 问 答 流 程
+
+流程图规范
+
+●
+
+●
+
+●
+
+●
+
+用户提问
+
+问题向量化
+
+向量检索 TopK
+
+上下文拼接
+
+LLM 生成
+
+展示结果
+
+文 档 处 理 流 程
+
+上传文档
+
+文本提取
+
+文本切分
+
+向量化
+
+存入向量库
+
+今日输出：完整的系统流程图（包含问答流程和文档处理流程）
+
+03
+
+ 开始/结束 → 椭圆 处理步骤 → 矩形 判断条件 → 菱形 流向 → 箭头RAG  流程图详解
+
+RAG  完整流程包含  6 个核心步骤，从用户提问到返回答案，每个环节都有明确的输入、输出和异常处理机制
+
+1 用户提问
+
+2 查询向量化
+
+3 向量检索  TopK
+
+6 LLM  生成回答
+
+5 Prompt  拼接
+
+4 上下文构建
+
+关键设计要点
+
+并行处理：向量化可批量处理多个 chunk ，提高吞吐
+
+异步处理：文档处理为耗时操作，使用异步任务避免阻塞
+
+异常处理：每个环节独立捕获异常，确保流程健壮性
+
+流式输出： LLM 生成使用 SSE 实现打字机效果，提升用户体验
+
+04
+
+接收用户输入的自然语言问题使用Embedding模型将问题转为向量在FAISS中搜索最相似的K个文本块将检索结果按格式拼接为参考上下文构建系统指令+上下文+问题的Prompt调用大模型API生成最终答案分层架构与请求流转
+
+一个请求在后端是如何一层层流转的
+
+•  请求生命周期：前端 →  Controller → Service → Mapper → MySQL →  逐层返回
+
+•  Controller （控制层）：接收请求、校验参数、组装响应，不写业务逻辑
+
+•  Service （业务层）：核心业务逻辑、事务控制、组合调用多个  Mapper
+
+•  Mapper （数据层）：数据库  CRUD ， MyBatis-Plus  继承  BaseMapper  自动生成
+
+•  Entity / DTO / VO ：数据库实体  /  接口入参  /  接口出参，三者分离更清晰
+
+•  统一响应  Result<T> +  全局异常处理：前端只需判断  code  即可
+
+Day 2 ·  基础功能开发
+
+统一响应格式  Result<T>
+
+所有接口返回同一种结构，前端处理更简单
+
+public class Result<T> {
+    private int code;         // 200 成功  / 400 参数错  / 401 未授权  / 500 错误
+    private String message;
+    private T data;
+    private long timestamp = System.currentTimeMillis();
+
+@Data
+
+    public static <T> Result<T> success(T data) {
+        Result<T> r = new Result<>();
+        r.code = 200; r.message = "success"; r.data = data;
+        return r;
+    }
+    public static <T> Result<T> error(int code, String msg) {
+        Result<T> r = new Result<>();
+        r.code = code; r.message = msg;
+        return r;
+    }
+}
+
+返回示例： { "code":200, "message":"success", "data":{...} }
+
+Day 2 ·  基础功能开发
+
+ 
+全局异常处理
+
+@RestControllerAdvice  统一捕获异常，避免每个接口都  try-catch
+
+public class GlobalExceptionHandler {
+
+@RestControllerAdvice
+
+    @ExceptionHandler(BizException.class)          //  自定义业务异常
+    public Result<Void> biz(BizException e) {
+        return Result.error(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)  //  参数校验失败
+    public Result<Void> valid(MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getFieldError().getDefaultMessage();
+        return Result.error(400, msg);
+    }
+
+    @ExceptionHandler(Exception.class)             //  兜底
+    public Result<Void> all(Exception e) {
+        return Result.error(500, " 服务器错误 : " + e.getMessage());
+    }
+}
+
+Day 2 ·  基础功能开发
+
+ 
+ 
+ 
+02
+
+后端：用户模块开发
+
+实体与  Mapper 、 CRUD  接口、注册校验与密码加密
+
+项目结构与核心依赖
+
+Spring Boot 3.x + MyBatis-Plus  工程骨架
+
+•  controller / service / mapper / entity / dto / config / common  分包
+
+•  lombok —— @Data  自动生成  getter/setter
+
+•  spring-boot-starter-web —— Web  与  RESTful  接口
+
+•  spring-boot-starter-validation ——  参数校验  @Valid
+
+•  mybatis-plus-boot-starter —— CRUD 、分页、条件构造器
+
+•  jjwt (io.jsonwebtoken) ——  生成与解析  JWT Token
+
+•  mysql-connector-j —— MySQL 8  驱动
+
+Day 2 ·  基础功能开发
+
+实体类与  Mapper （ MyBatis-Plus ）
+
+继承  BaseMapper  即自动拥有全部  CRUD  能力
+
+@Data
+
+@TableName("sys_user")
+public class User {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String username;
+    private String password;      //  存  BCrypt  密文
+    private String email;
+    private String role;          // admin / user
+    private Integer status;       // 1 启用  0 禁用
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+}
+
+// Mapper ：无需写任何  SQL ，自动拥有增删改查
+public interface UserMapper extends BaseMapper<User> { }
+
+Day 2 ·  基础功能开发
+
+ 
+后端服务基础接口开发
+
+Controller
+
+Service
+
+Mapper
+
+统一响应封装
+
+Result<T>  统一响应类
+
+code:  状态码（ 200 成功）
+
+message:  提示信息
+
+data:  业务数据（泛型）
+
+timestamp:  响应时间戳
+
+全局配置
+
+全局异常处理
+
+@RestControllerAdvice + @ExceptionHandler
+
+跨域配置
+
+CorsConfig  全局允许前端域名
+
+接口调试
+
+Postman / Swagger  测试接口
+
+💡 MyBatis-Plus  简化开发：使用  BaseMapper 、 IService 、 ServiceImpl  快速实现  CRUD ，无需手写 SQL
+
+05
+
+（接收请求） → （业务逻辑） → （数据访问）Spring Boot 三层架构，职责分离，便于维护和扩展用户模块  Controller （ REST  接口）
+
+用  HTTP  方法语义化地暴露增删改查
+
+@RequestMapping("/api/user")
+public class UserController {
+    @Resource private UserService userService;
+
+@RestController
+
+    @GetMapping("/list")        //  分页  +  关键字查询
+    public Result<Page<User>> list(@RequestParam(defaultValue="1") int page,
+                                   @RequestParam(defaultValue="10") int size,
+                                   @RequestParam(required=false) String keyword) {
+        return Result.success(userService.page(page, size, keyword));
+    }
+    @PostMapping("/register")   //  注册
+    public Result<Long> register(@Valid @RequestBody RegisterDTO dto) {
+        return Result.success(userService.register(dto));
+    }
+    @PutMapping("/{id}")        //  修改
+    public Result<Void> update(@PathVariable Long id, @RequestBody User u) {
+        u.setId(id); userService.updateById(u); return Result.success(null);
+    }
+    @DeleteMapping("/{id}")     //  删除  /  禁用
+    public Result<Void> delete(@PathVariable Long id) {
+        userService.removeById(id); return Result.success(null);
+    }
+}
+
+Day 2 ·  基础功能开发
+
+ 
+用户  Service （业务逻辑  +  分页查询）
+
+ServiceImpl  提供基础  CRUD ，条件构造器写查询
+
+public class UserService extends ServiceImpl<UserMapper, User> {
+
+@Service
+
+    public Page<User> page(int page, int size, String keyword) {
+        LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword))
+            qw.like(User::getUsername, keyword);      //  按用户名模糊搜索
+        qw.orderByDesc(User::getCreateTime);          //  按创建时间倒序
+        return this.page(new Page<>(page, size), qw); //  自动分页
+    }
+}
+
+分页需配置  PaginationInnerInterceptor （ MyBatis-Plus  分页插件）
+
+Day 2 ·  基础功能开发
+
+ 
+用户注册：参数校验  +  密码加密
+
+DTO  上声明校验规则，密码用  BCrypt  加密后入库
+
+// 1) DTO  上声明校验规则， @Valid  自动触发
+
+@Data
+public class RegisterDTO {
+    @NotBlank(message = " 用户名不能为空 ")  private String username;
+    @Size(min = 6, message = " 密码至少 6 位 ") private String password;
+    @Email(message = " 邮箱格式不正确 ")     private String email;
+}
+
+// 2) Service  注册逻辑：查重  +  加密
+public Long register(RegisterDTO dto) {
+    Long exist = lambdaQuery().eq(User::getUsername, dto.getUsername()).count();
+    if (exist > 0) throw new BizException(400, " 用户名已存在 ");
+    User u = new User();
+    BeanUtils.copyProperties(dto, u);
+    u.setPassword(new BCryptPasswordEncoder().encode(dto.getPassword()));
+    u.setRole("user"); u.setStatus(1);
+    save(u);
+    return u.getId();
+}
+
+Day 2 ·  基础功能开发
+
+ 
+用户模块  CRUD  开发
+
+Create  注册
+
+Read  查询
+
+Update  修改
+
+Delete  删除
+
+分页查询（ PageHelper ）
+
+按用户名模糊搜索
+
+按角色筛选
+
+返回用户列表
+
+支持排序
+
+支持修改邮箱
+
+支持修改角色
+
+禁止修改用户名
+
+根据 ID 更新
+
+返回更新结果
+
+软删除（推荐）
+
+更新 status=0
+
+保留数据可追溯
+
+硬删除（谨慎）
+
+物理删除记录
+
+MyBatis-Plus  简化  CRUD
+
+06
+
+接收用户名/密码/邮箱参数校验（非空/格式）密码BCrypt加密存入数据库返回用户信息（脱敏）// Mapper 继承 BaseMapper，自动获得基础CRUD方法public interface UserMapper extends BaseMapper<User> { }// Service 继承 ServiceImpl，获得完整CRUD服务@Service public class UserService extends ServiceImpl<UserMapper, User> {　　// 可直接使用 save() / remove() / update() / list() 等方法}03
+
+登录认证与权限控制
+
+JWT  机制、登录接口、 Token  拦截器与访问控制
+
+登录认证机制
+
+登 录 流 程
+
+接收用户名 / 密码
+
+查询用户
+
+密码比对
+
+生成  Token
+
+返回 Token+ 信息
+
+退出登录
+
+安全要点
+
+客户端：清除  localStorage  中的  Token
+
+服务端（可选）：加入  Token  黑名单
+
+会话管理
+
+无状态设计，服务端不保存会话
+
+依靠  Token  进行身份验证
+
+●
+
+●
+
+●
+
+●
+
+●
+
+💡 密码比对：使用  BCrypt.match()  进行密码验证，禁止明文比较。 BCrypt  内部会自动处理  salt ，安全且方便。
+
+07
+
+ 密码传输使用 HTTPS 加密 登录失败次数限制（防暴力破解） 防止 SQL 注入（参数化查询） BCrypt 密码比对（时序安全） Token 设置合理过期时间Token  机制详解
+
+JWT （ JSON Web Token ）结构
+
+Header
+
+Payload
+
+Signature
+
+Token  生成与验证
+
+生成：使用  JJWT  库
+
+设置主题（ sub ）、过期时间（ exp ）
+
+添加自定义  claims （ userId, role ）
+
+验证：拦截器中验证
+
+签名合法性、是否过期
+
+解析用户信息
+
+08
+
+Token  策略
+
+双  Token  策略
+
+Access Token （短效 15 分钟）
+
+Refresh Token （长效 7 天）
+
+存储方式
+
+前端存储在  localStorage
+
+每次请求携带在  Authorization  头
+
+（算法信息） . （用户数据: sub, exp, claims） . （签名验证）eyJhbGciOiJIUzI1NiJ9 . eyJzdWIiOiJ1c2VyMSJ9 . SflKxwRJSMeKKF2QT4fwpMe...JWT  工具类：生成与解析  Token
+
+登录后签发  Token ，后续请求携带它证明身份
+
+public class JwtUtil {
+    private static final String SECRET = "campus-qa-secret-key-2026";
+    private static final long EXPIRE = 24 * 60 * 60 * 1000L;  // 24  小时
+
+@Component
+
+    public String generate(Long userId, String role) {       //  签发
+        return Jwts.builder()
+            .setSubject(String.valueOf(userId))
+            .claim("role", role)
+            .setExpiration(new Date(System.currentTimeMillis() + EXPIRE))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()))
+            .compact();
+    }
+    public Claims parse(String token) {                       //  解析 / 校验
+        return Jwts.parserBuilder()
+            .setSigningKey(Keys.hmacShaKeyFor(SECRET.getBytes()))
+            .build().parseClaimsJws(token).getBody();
+    }
+}
+
+Day 2 ·  基础功能开发
+
+ 
+登录接口实现
+
+校验用户名密码 → 签发  Token →  返回给前端
+
+public Result<Map<String,Object>> login(@RequestBody LoginDTO dto) {
+    User u = userService.lambdaQuery()
+             .eq(User::getUsername, dto.getUsername()).one();
+    // BCrypt  比对：明文  vs  密文
+    if (u == null || !new BCryptPasswordEncoder()
+            .matches(dto.getPassword(), u.getPassword()))
+        throw new BizException(401, " 用户名或密码错误 ");
+    if (u.getStatus() == 0) throw new BizException(403, " 账号已被禁用 ");
+
+@PostMapping("/login")
+
+    String token = jwtUtil.generate(u.getId(), u.getRole());
+    Map<String,Object> res = new HashMap<>();
+    res.put("token", token);
+    res.put("username", u.getUsername());
+    res.put("role", u.getRole());
+    return Result.success(res);
+}
+
+Day 2 ·  基础功能开发
+
+ 
+登录拦截器：统一校验  Token
+
+在拦截器里校验  Token ，未登录直接拦截
+
+public class JwtInterceptor implements HandlerInterceptor {
+    @Resource private JwtUtil jwtUtil;
+
+@Component
+
+    @Override
+    public boolean preHandle(HttpServletRequest req,
+                             HttpServletResponse resp, Object handler) {
+        String auth = req.getHeader("Authorization");
+        if (auth == null || !auth.startsWith("Bearer "))
+            throw new BizException(401, " 未登录 ");
+        try {
+            Claims c = jwtUtil.parse(auth.substring(7));
+            req.setAttribute("userId", c.getSubject());
+            req.setAttribute("role", c.get("role"));
+            return true;
+        } catch (Exception e) {
+            throw new BizException(401, "Token  无效或已过期 ");
+        }
+    }
+}
+// WebConfig  注册： addPathPatterns("/api/**")
+//   .excludePathPatterns("/api/user/login", "/api/user/register")
+
+Day 2 ·  基础功能开发
+
+ 
+角色权限
+
+管理员  admin
+
+普通用户  user
+
+权限控制：登录状态与访问控制
+
+路由守卫
+
+未登录 → 自动跳转登录页
+
+已登录 → 不可访问登录页
+
+实现：路由拦截器
+
+检查  localStorage  中  Token
+
+验证  Token  有效性
+
+前端权限实现
+
+动态路由：根据用户角色动态生成可访问路由列表
+
+菜单权限：侧边栏菜单根据角色过滤显示
+
+按钮级权限：自定义  v-permission  指令，控制按钮显示 / 隐藏
+
+最小权限原则：前后端双重校验，前端控制展示，后端控制数据
+
+11
+
+可访问所有页面和功能受限访问（不可进入用户管理）后端通过 Token 解析角色控制04
+
+前端实现
+
+Axios  封装、登录页与用户管理页（ React + Ant Design ）
+
+Axios  封装与拦截器
+
+请求自动带  Token ，响应统一处理错误
+
+// src/services/request.ts
+
+import axios from "axios";
+const request = axios.create({ baseURL: "/api", timeout: 10000 });
+
+//  请求拦截：自动携带  token
+request.interceptors.request.use(cfg => {
+  const token = localStorage.getItem("token");
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
+});
+//  响应拦截：统一解包与错误处理
+request.interceptors.response.use(
+  res => {
+    const { code, message, data } = res.data;
+    if (code !== 200) { return Promise.reject(message); }
+    return data;
+  },
+  err => {
+    if (err.response?.status === 401) location.href = "/login";  //  未登录跳转
+    return Promise.reject(err);
+  }
+);
+export default request;
+
+Day 2 ·  基础功能开发
+
+ 
+登录页实现（ React + Ant Design ）
+
+Antd Form  收集输入，登录成功保存  token  并跳转
+
+import { Form, Input, Button, message } from "antd";
+import { useNavigate } from "react-router-dom";
+import request from "../services/request";
+
+// src/pages/Login.tsx
+
+export default function Login() {
+  const nav = useNavigate();
+  const onFinish = async (v: any) => {
+    const data = await request.post("/user/login", v);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("role", data.role);
+    message.success(" 登录成功 "); nav("/");
+  };
+  return (
+    <Form onFinish={onFinish} style={{ maxWidth: 320, margin: "120px auto" }}>
+      <Form.Item name="username" rules={[{ required: true }]}>
+        <Input placeholder=" 用户名 " /></Form.Item>
+      <Form.Item name="password" rules={[{ required: true }]}>
+        <Input.Password placeholder=" 密码 " /></Form.Item>
+      <Button type="primary" htmlType="submit" block> 登录 </Button>
+    </Form>);
+}
+
+Day 2 ·  基础功能开发
+
+ 
+注册页设计
+
+表单元素
+
+表单验证
+
+前端页面：登录页与注册页
+
+登录页设计
+
+表单元素
+
+用户名输入框  /  密码输入框
+
+登录按钮  /  记住我选项
+
+跳转注册链接
+
+表单验证
+
+必填校验  /  格式校验
+
+状态管理与路由
+
+状态管理：使用  React Context  或  Zustand  管理登录状态（ isLoggedIn, userInfo, token ）
+
+路由配置： React Router  配置  /login  和  /register  路由
+
+登录后处理：保存  Token →  跳转首页 → 更新全局状态
+
+表单库：推荐使用  React Hook Form + Zod  进行表单管理和校验
+
+09
+
+用户名 / 密码 / 确认密码 / 邮箱注册按钮 / 跳转登录链接密码强度提示 / 邮箱正则校验两次密码一致性检查用户管理页  Table （分页  /  搜索）
+
+Antd Table  展示列表，接入后端分页接口
+
+// src/pages/UserList.tsx
+
+import { useEffect, useState } from "react";
+import { Table, Input, Tag } from "antd";
+import request from "../services/request";
+
+export default function UserList() {
+  const [data, setData] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const load = async (p = 1, keyword = "") => {
+    const res = await request.get("/user/list",
+                    { params: { page: p, size: 10, keyword } });
+    setData(res.records); setTotal(res.total);
+  };
+  useEffect(() => { load(); }, []);
+  const columns = [
+    { title: " 用户名 ", dataIndex: "username" },
+    { title: " 邮箱 ",   dataIndex: "email" },
+    { title: " 角色 ",   dataIndex: "role", render: (r) => <Tag>{r}</Tag> },
+    { title: " 状态 ",   dataIndex: "status",
+      render: (s) => (s ? " 启用 " : " 禁用 ") },
+  ];
+  return <>
+    <Input.Search onSearch={(k) => load(1, k)} style={{ width: 240 }} />
+    <Table rowKey="id" columns={columns} dataSource={data}
+           pagination={{ total, pageSize: 10, onChange: (p) => load(p) }} />
+  </>;
+}
+
+Day 2 ·  基础功能开发
+
+ 
+用户管理页面
+
+编辑用户
+
+弹窗表单编辑
+
+可修改邮箱、角色
+
+提交后刷新列表
+
+新增用户
+
+页面布局
+
+禁用 / 启用
+
+状态切换按钮
+
+软删除 / 恢复
+
+即时生效
+
+删除用户
+
+确认弹窗二次确认
+
+防止误操作
+
+删除后刷新列表
+
+弹窗表单，包含所有必填字段（用户名、密码、邮箱、角色）
+
+表单验证通过后调用注册接口，成功后刷新用户列表
+
+权限控制：仅管理员（ admin 角色）可见用户管理入口
+
+10
+
+：搜索栏（用户名/角色筛选） + 用户表格 + 分页组件表格展示：序号 / 用户名 / 邮箱 / 角色 / 状态 / 创建时间 / 操作列常见问题与调试
+
+开发中最常踩的坑与排查思路
+
+•  CORS  跨域：后端配置  CorsConfig  允许前端域名；前端  vite.config  配  /api  代
+理
+
+•  密码总是校验失败：注册时必须  BCrypt  加密，登录时用  matches()  比对，
+切勿明文
+
+•  401  未授权：检查请求头是否携带  Authorization: Bearer <token>
+
+•  Token  过期：响应拦截器捕获  401 →  清除本地  token →  跳转登录页
+
+•  分页查不到数据：确认已配置  MyBatis-Plus  分页插件 
+PaginationInnerInterceptor
+
+•  createTime  为  null ： @TableField(fill=INSERT) +  实现  MetaObjectHandler  自动填
+充
+
+Day 2 ·  基础功能开发
+
+Day 2  输出要求
+
+01
+
+代码提交
+
+02
+
+日报
+
+03
+
+系统流程图
+
+04
+
+用户 CRUD 模块
+
+记录今日完成工作内容
+
+系统流程图  + RAG 流程图
+
+完整的增删改查功能
+
+功能验收标准
+
+✓ 用户可正常注册、登录、退出
+
+✓ 管理员可查看用户列表、编辑、禁用 / 删除用户
+
+✓ 未登录用户无法访问需要认证的页面
+
+✓ 普通用户无法进入用户管理页面
+
+✓ 所有接口有正确的权限校验
+
+12
+
+GitLab提交今日完成的代码D A Y   2   C O M P L E T E D
+
+Day 2  课程小结
+
+明天进入  RAG  技术专题！
+
+绘制系统流程图 → 完成后端基础接口→ 实现用户CRUD → 登录认证与Token机制→ 权限控制Next: Day 3 RAG技术专题 — 理论与代码实战

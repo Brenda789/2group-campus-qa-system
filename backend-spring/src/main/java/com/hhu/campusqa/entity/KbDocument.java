@@ -36,8 +36,14 @@ public class KbDocument {
     /** 处理状态：PROCESSING / READY / ERROR */
     private String status;
 
-    /** 上传者 ID */
+    /** 上传者 ID（匿名上传时为 null） */
     private Long uploadedBy;
+
+    /** 是否临时文档（匿名上传），服务重启后清理 */
+    private Boolean isTemporary;
+
+    /** 处理失败时的错误信息 */
+    private String errorMessage;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
