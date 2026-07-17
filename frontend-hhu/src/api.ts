@@ -59,6 +59,16 @@ export const userApi = {
     console.warn(`${MOCK_PREFIX} me fallback`)
     return { username: 'admin', role: 'admin' }
   }),
+
+  /** 修改密码
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request.put('/user/password', { oldPassword, newPassword }),
+
+  /** 修改个人信息（邮箱）
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  updateProfile: (email: string) =>
+    request.put('/user/profile', { email }),
 }
 
 // ==================== 问答 ====================
@@ -99,6 +109,10 @@ export const chatApi = {
    *  不设 mock 降级——写操作必须透传后端错误。 */
   deleteConversation: (convId: number) =>
     request.delete(`/chat/conversations/${convId}`),
+
+  /** 问答点赞/踩（1=赞、-1=踩、0=取消） */
+  feedback: (recordId: number, value: number) =>
+    request.put(`/chat/${recordId}/feedback`, { feedback: value }),
 }
 
 // ==================== 文档管理 ====================
@@ -126,6 +140,13 @@ export const docApi = {
 
   /** 重新处理单个文档 */
   reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
+
+  /** 公开搜索已就绪的文档 */
+  search: (keyword?: string) =>
+    request.get('/documents/search', { params: { keyword } }).catch(() => {
+      console.warn(`${MOCK_PREFIX} doc search fallback`)
+      return []
+    }),
 }
 
 // ==================== 管理后台（Admin） ====================

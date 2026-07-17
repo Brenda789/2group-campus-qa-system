@@ -14,6 +14,8 @@ import {
   TeamOutlined,
   TrophyOutlined,
   SafetyOutlined,
+  LikeOutlined,
+  DislikeOutlined,
 } from '@ant-design/icons'
 import { chatApi, docApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
@@ -24,6 +26,8 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   sources?: string[]
+  recordId?: number   // qa_record ID，用于点赞/踩
+  feedback?: number   // 1=赞, -1=踩, 0=未评价
 }
 
 interface ConvItem {
@@ -151,6 +155,8 @@ export default function HomePage() {
         role: 'assistant',
         content: res.answer || '（未获取到回答）',
         sources: safeParseSources(res.sourceDocs),
+        recordId: res.id,   // 用于点赞/踩
+        feedback: 0,
       }
 
       if (isLoggedIn) {
@@ -180,6 +186,20 @@ export default function HomePage() {
       message.error('发送失败，请稍后重试')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ==================== 点赞/踩 ====================
+
+  const handleFeedback = async (recordId: number, value: number, msgIndex: number) => {
+    try {
+      await chatApi.feedback(recordId, value)
+      setMessages((prev) => prev.map((m, i) =>
+        i === msgIndex ? { ...m, feedback: value } : m
+      ))
+      message.success(value === 1 ? '已点赞' : '已踩')
+    } catch {
+      message.error('操作失败')
     }
   }
 
@@ -690,6 +710,29 @@ export default function HomePage() {
                     >
                       {msg.content}
                     </div>
+                    {/* 点赞/踩按钮（仅登录用户 + 助手消息 + 有 recordId） */}
+                    {isLoggedIn && msg.role === 'assistant' && msg.recordId && (
+                      <div style={{ marginTop: 4, display: 'flex', gap: 8, justifyContent: 'flex-start' }}>
+                        <span
+                          onClick={() => handleFeedback(msg.recordId!, msg.feedback === 1 ? 0 : 1, i)}
+                          style={{
+                            cursor: 'pointer', fontSize: 14,
+                            color: msg.feedback === 1 ? '#005BAC' : '#999',
+                            transition: 'color 0.2s',
+                          }}
+                          title="赞"
+                        ><LikeOutlined /></span>
+                        <span
+                          onClick={() => handleFeedback(msg.recordId!, msg.feedback === -1 ? 0 : -1, i)}
+                          style={{
+                            cursor: 'pointer', fontSize: 14,
+                            color: msg.feedback === -1 ? '#ff4d4f' : '#999',
+                            transition: 'color 0.2s',
+                          }}
+                          title="踩"
+                        ><DislikeOutlined /></span>
+                      </div>
+                    )}
                   </div>
                 ))}
               {loading && (
