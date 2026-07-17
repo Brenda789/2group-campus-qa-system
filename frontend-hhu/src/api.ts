@@ -68,13 +68,11 @@ export const chatApi = {
     request.post('/chat/ask', { question, conversationId }).catch(() => {
       console.warn(`${MOCK_PREFIX} chat ask fallback`)
       return {
-        data: {
-          id: Date.now(),
-          question,
-          answer: '（模拟回答）这是对您问题的自动回复。后端服务暂时不可用，数据仅供前端演示。',
-          sourceDocs: ['河海大学简介.md', '学生服务指南.pdf'],
-          createTime: new Date().toISOString(),
-        },
+        id: Date.now(),
+        question,
+        answer: '（模拟回答）后端服务暂时不可用，数据仅供前端演示。',
+        sourceDocs: '[]',
+        createTime: new Date().toISOString(),
       }
     }),
 

@@ -47,7 +47,12 @@ const features = [
   { icon: <EnvironmentOutlined />, title: '三区办学', desc: '南京·常州，一校多区', color: '#d97706', bg: '#fffbeb' },
 ]
 
-/** 前台门户首页 + 浮动问答机器人（侧边栏版） */
+/** 前台门户首页 + 浮动问答机器人
+ *
+ *  支持两种模式：
+ *  - 访客（未登录）：问答正常使用，会话记录存在浏览器内存中，刷新页面后消失
+ *  - 登录用户：会话记录持久化到后端，刷新不丢失
+ */
 export default function HomePage() {
   const navigate = useNavigate()
   const { isLoggedIn, user, logout } = useAuth()
@@ -63,47 +68,53 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
 
+  // ======== 访客模式：本地会话存储（刷新即消失） ========
+  const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
+  const [guestNextId, setGuestNextId] = useState(1)
+
   // 自动滚动到底部
   useEffect(() => {
     msgEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 打开聊天窗口时加载会话列表（仅登录用户）
+  // 打开聊天窗口时加载会话列表
   useEffect(() => {
-    if (chatOpen && isLoggedIn) loadConversations()
+    if (!chatOpen) return
+    if (isLoggedIn) {
+      loadConversationsFromApi()
+    } else {
+      loadConversationsFromLocal()
+    }
   }, [chatOpen, isLoggedIn])
 
-  /** 统一入口：需要登录才能使用问答 */
-  const handleOpenChat = () => {
-    if (!isLoggedIn) {
-      message.info('请先登录后使用问答功能')
-      navigate('/login')
-      return
-    }
-    setChatOpen(true)
-  }
+  // ==================== 会话列表 ====================
 
-  /** 快捷问题点击也需要登录校验 */
-  const handleQuickQuestion = (q: string) => {
-    if (!isLoggedIn) {
-      message.info('请先登录后使用问答功能')
-      navigate('/login')
-      return
-    }
-    setChatOpen(true)
-    setTimeout(() => send(q), 300)
-  }
-
-  const loadConversations = async () => {
+  const loadConversationsFromApi = async () => {
     try {
       const list: any = await chatApi.conversations()
       setConversations(list || [])
-    } catch {
-      // 未登录时静默失败
-    }
+    } catch { /* 静默失败 */ }
   }
 
-  const loadMessages = async (convId: number) => {
+  const loadConversationsFromLocal = () => {
+    const list: ConvItem[] = Object.entries(guestConvs).map(([id, msgs]) => {
+      const firstUser = msgs.find(m => m.role === 'user')
+      const title = firstUser
+        ? (firstUser.content.length > 30 ? firstUser.content.substring(0, 30) + '...' : firstUser.content)
+        : '新会话'
+      return { id: Number(id), title }
+    })
+    setConversations(list)
+  }
+
+  const loadConversations = () => {
+    if (isLoggedIn) loadConversationsFromApi()
+    else loadConversationsFromLocal()
+  }
+
+  // ==================== 消息加载 ====================
+
+  const loadMessagesFromApi = async (convId: number) => {
     setConvLoading(true)
     try {
       const list: any = await chatApi.messages(convId)
@@ -121,33 +132,50 @@ export default function HomePage() {
     }
   }
 
+  const loadMessagesFromLocal = (convId: number) => {
+    setMessages(guestConvs[convId] || [])
+  }
+
   // ==================== 发送消息 ====================
+
   const send = async (text: string) => {
-    if (!isLoggedIn) {
-      message.info('请先登录后使用问答功能')
-      navigate('/login')
-      return
-    }
     if (!text.trim() || loading) return
     const q = text.trim()
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: q }])
     setLoading(true)
     try {
-      const res: any = await chatApi.ask(q, activeConvId ?? undefined)
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.answer,
-          sources: safeParseSources(res.sourceDocs),
-        },
-      ])
-      // 新会话 → 设置为当前活跃会话
-      if (!activeConvId && res.conversationId) {
-        setActiveConvId(res.conversationId)
+      const res: any = await chatApi.ask(q, isLoggedIn ? (activeConvId ?? undefined) : undefined)
+
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: res.answer || '（未获取到回答）',
+        sources: safeParseSources(res.sourceDocs),
       }
-      loadConversations() // 刷新侧边栏列表
+
+      if (isLoggedIn) {
+        // ---- 登录用户：后端持久化 ----
+        setMessages((prev) => [...prev, assistantMsg])
+        if (!activeConvId && res.conversationId) {
+          setActiveConvId(res.conversationId)
+        }
+        loadConversationsFromApi()
+      } else {
+        // ---- 访客：本地存储 ----
+        let convId = activeConvId
+        if (convId === null) {
+          // 新会话
+          convId = guestNextId
+          setGuestNextId((n) => n + 1)
+          setActiveConvId(convId)
+        }
+        setGuestConvs((prev) => {
+          const existing = prev[convId!] || []
+          return { ...prev, [convId!]: [...existing, { role: 'user', content: q }, assistantMsg] }
+        })
+        setMessages((prev) => [...prev, assistantMsg])
+        loadConversationsFromLocal()
+      }
     } catch {
       message.error('发送失败，请稍后重试')
     } finally {
@@ -155,7 +183,52 @@ export default function HomePage() {
     }
   }
 
+  // ==================== 会话操作 ====================
+
+  const selectConversation = (convId: number) => {
+    setActiveConvId(convId)
+    if (isLoggedIn) {
+      loadMessagesFromApi(convId)
+    } else {
+      loadMessagesFromLocal(convId)
+    }
+  }
+
+  const newConversation = () => {
+    setActiveConvId(null)
+    setMessages([])
+  }
+
+  const deleteConversation = async (convId: number) => {
+    if (isLoggedIn) {
+      try {
+        await chatApi.deleteConversation(convId)
+        message.success('已删除')
+        if (activeConvId === convId) {
+          setActiveConvId(null)
+          setMessages([])
+        }
+        loadConversationsFromApi()
+      } catch {
+        message.error('删除失败')
+      }
+    } else {
+      // 访客：直接从本地移除
+      setGuestConvs((prev) => {
+        const next = { ...prev }
+        delete next[convId]
+        return next
+      })
+      if (activeConvId === convId) {
+        setActiveConvId(null)
+        setMessages([])
+      }
+      loadConversationsFromLocal()
+    }
+  }
+
   // ==================== 上传文档 ====================
+
   const handleUpload = async (info: any) => {
     const file = info.file as File
     setUploading(true)
@@ -167,31 +240,6 @@ export default function HomePage() {
       message.error(e?.message || '上传失败')
     } finally {
       setUploading(false)
-    }
-  }
-
-  // ==================== 会话操作 ====================
-  const selectConversation = (convId: number) => {
-    setActiveConvId(convId)
-    loadMessages(convId)
-  }
-
-  const newConversation = () => {
-    setActiveConvId(null)
-    setMessages([])
-  }
-
-  const deleteConversation = async (convId: number) => {
-    try {
-      await chatApi.deleteConversation(convId)
-      message.success('已删除')
-      if (activeConvId === convId) {
-        setActiveConvId(null)
-        setMessages([])
-      }
-      loadConversations()
-    } catch {
-      message.error('删除失败')
     }
   }
 
@@ -225,19 +273,20 @@ export default function HomePage() {
           <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>河海大学</span>
         </div>
         <Space>
+          {/* 上传文档按钮：所有人可见 */}
+          <Button
+            ghost
+            onClick={() => setUploadOpen(true)}
+            icon={<UploadOutlined />}
+            style={{
+              borderRadius: 8, fontWeight: 600, fontSize: 14,
+              borderColor: '#7dd3fc', color: '#7dd3fc',
+            }}
+          >
+            上传文档
+          </Button>
           {isLoggedIn ? (
             <>
-              <Button
-                ghost
-                onClick={() => setUploadOpen(true)}
-                icon={<UploadOutlined />}
-                style={{
-                  borderRadius: 8, fontWeight: 600, fontSize: 14,
-                  borderColor: '#7dd3fc', color: '#7dd3fc',
-                }}
-              >
-                上传文档
-              </Button>
               <span style={{ color: '#a5d8ff', fontSize: 14, fontWeight: 500 }}>
                 👋 {user.username}
               </span>
@@ -300,7 +349,6 @@ export default function HomePage() {
           textAlign: 'center',
         }}
       >
-        {/* 暗色遮罩 */}
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(180deg, rgba(10,37,64,0.85) 0%, rgba(13,59,102,0.75) 60%, rgba(240,244,249,1) 100%)',
@@ -365,6 +413,7 @@ export default function HomePage() {
               <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 14 }}>
                 基于大语言模型的校园智能问答系统，覆盖校内办事指南、教务政策、生活服务等高频问题。
                 点击右下角机器人图标开始提问。
+                {!isLoggedIn && ' 登录后可永久保存问答记录。'}
               </Paragraph>
               <Space wrap>
                 {QUICK_QUESTIONS.map((q) => (
@@ -374,7 +423,7 @@ export default function HomePage() {
                       cursor: 'pointer', borderRadius: 20, padding: '4px 14px',
                       fontSize: 13, border: '1px solid #dbeafe', background: '#eff6ff', color: '#005BAC',
                     }}
-                    onClick={() => handleQuickQuestion(q)}
+                    onClick={() => { setChatOpen(true); setTimeout(() => send(q), 300) }}
                   >
                     {q}
                   </Tag>
@@ -386,7 +435,7 @@ export default function HomePage() {
                 type="primary"
                 size="large"
                 icon={<RobotOutlined />}
-                onClick={handleOpenChat}
+                onClick={() => setChatOpen(true)}
                 style={{
                   borderRadius: 30, height: 52, padding: '0 32px', fontSize: 16, fontWeight: 600,
                   background: 'linear-gradient(135deg, #005BAC, #0ea5e9)',
@@ -412,7 +461,7 @@ export default function HomePage() {
       {/* 浮动问答按钮 */}
       {!chatOpen && (
         <button
-          onClick={handleOpenChat}
+          onClick={() => setChatOpen(true)}
           style={{
             position: 'fixed',
             right: 28,
@@ -457,6 +506,14 @@ export default function HomePage() {
                 fontSize: 15, color: '#fff',
               }}><RobotOutlined /></span>
               <span style={{ fontWeight: 700, fontSize: 15 }}>河海问答助手</span>
+              {!isLoggedIn && (
+                <Tag style={{
+                  borderRadius: 10, fontSize: 10, border: '1px solid #fbbf24',
+                  background: '#fef3c7', color: '#92400e',
+                }}>
+                  访客模式 · 刷新后记录消失
+                </Tag>
+              )}
             </Space>
           }
           extra={
@@ -477,7 +534,7 @@ export default function HomePage() {
           }}
           styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden' } }}
         >
-          {/* ======== 左侧：会话列表（需登录） ======== */}
+          {/* ======== 左侧：会话列表 ======== */}
           <div
             style={{
               width: 200,
@@ -488,94 +545,87 @@ export default function HomePage() {
               background: '#fafafa',
             }}
           >
-            {!isLoggedIn ? (
-              <div style={{ textAlign: 'center', padding: '40px 16px', color: '#999', fontSize: 13 }}>
-                <SafetyOutlined style={{ fontSize: 32, marginBottom: 12, color: '#bbb' }} />
-                <p>请先登录后<br />使用问答功能</p>
-                <Button type="primary" size="small" onClick={() => navigate('/login')} style={{ marginTop: 8 }}>
-                  去登录
-                </Button>
-              </div>
-            ) : (
-              <>
-                {/* 新对话按钮 */}
-                <div style={{ padding: 12 }}>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    block
-                    onClick={newConversation}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    新对话
-                  </Button>
+            {/* 新对话按钮 */}
+            <div style={{ padding: 12 }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                block
+                onClick={newConversation}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                新对话
+              </Button>
+              {!isLoggedIn && (
+                <div style={{ textAlign: 'center', color: '#bbb', fontSize: 11, marginTop: 6 }}>
+                  💡 登录后可永久保存
                 </div>
+              )}
+            </div>
 
-                {/* 会话列表 */}
-                <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
-                  {conversations.map((conv) => (
-                    <div
-                      key={conv.id}
-                      onClick={() => selectConversation(conv.id)}
-                      onMouseEnter={() => setHoveredConv(conv.id)}
-                      onMouseLeave={() => setHoveredConv(null)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 10px',
-                        marginBottom: 2,
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                        background: activeConvId === conv.id ? '#e6f0ff' : 'transparent',
-                        border: activeConvId === conv.id ? '1px solid #b3d4ff' : '1px solid transparent',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      <span
-                        style={{
-                          flex: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontSize: 13,
-                          color: activeConvId === conv.id ? '#005BAC' : '#333',
-                          fontWeight: activeConvId === conv.id ? 500 : 400,
-                        }}
-                      >
-                        <MessageOutlined style={{ marginRight: 6, fontSize: 12, color: '#999' }} />
-                        {conv.title}
-                      </span>
-                      <DeleteOutlined
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          Modal.confirm({
-                            title: '确定删除该会话？',
-                            content: '删除后无法恢复',
-                            okText: '删除',
-                            okType: 'danger',
-                            cancelText: '取消',
-                            onOk: () => deleteConversation(conv.id),
-                          })
-                        }}
-                        style={{
-                          fontSize: 12,
-                          color: hoveredConv === conv.id ? '#ff4d4f' : '#bbb',
-                          cursor: 'pointer',
-                          marginLeft: 4,
-                          transition: 'color 0.15s',
-                        }}
-                      />
-                    </div>
-                  ))}
-                  {conversations.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#bbb', fontSize: 12, marginTop: 24 }}>
-                      暂无历史会话
-                    </div>
-                  )}
+            {/* 会话列表 */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => selectConversation(conv.id)}
+                  onMouseEnter={() => setHoveredConv(conv.id)}
+                  onMouseLeave={() => setHoveredConv(null)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    marginBottom: 2,
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: activeConvId === conv.id ? '#e6f0ff' : 'transparent',
+                    border: activeConvId === conv.id ? '1px solid #b3d4ff' : '1px solid transparent',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      color: activeConvId === conv.id ? '#005BAC' : '#333',
+                      fontWeight: activeConvId === conv.id ? 500 : 400,
+                    }}
+                  >
+                    <MessageOutlined style={{ marginRight: 6, fontSize: 12, color: '#999' }} />
+                    {conv.title}
+                  </span>
+                  <DeleteOutlined
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      Modal.confirm({
+                        title: '确定删除该会话？',
+                        content: '删除后无法恢复',
+                        okText: '删除',
+                        okType: 'danger',
+                        cancelText: '取消',
+                        onOk: () => deleteConversation(conv.id),
+                      })
+                    }}
+                    style={{
+                      fontSize: 12,
+                      color: hoveredConv === conv.id ? '#ff4d4f' : '#bbb',
+                      cursor: 'pointer',
+                      marginLeft: 4,
+                      transition: 'color 0.15s',
+                    }}
+                  />
                 </div>
-              </>
-            )}
+              ))}
+              {conversations.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#bbb', fontSize: 12, marginTop: 24 }}>
+                  暂无历史会话
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ======== 右侧：对话区 ======== */}
@@ -665,7 +715,7 @@ export default function HomePage() {
         </Card>
       )}
 
-      {/* 上传文档 Modal（wsy 的首页快速上传功能） */}
+      {/* 上传文档 Modal */}
       <Modal
         title="上传文档到知识库"
         open={uploadOpen}
@@ -675,7 +725,7 @@ export default function HomePage() {
       >
         <p style={{ color: '#999', marginBottom: 16 }}>
           支持 PDF / DOCX / TXT / MD，最大 10MB
-          {!isLoggedIn && '。未登录上传为临时文档，服务重启后清理'}
+          {!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}
         </p>
         <Upload
           beforeUpload={() => false}
