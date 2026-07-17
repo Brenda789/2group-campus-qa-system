@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Modal, Tag, message, Descriptions } from 'antd'
+import { Table, Modal, Tag, message, Descriptions, Button, Popconfirm } from 'antd'
 import { adminApi } from '../api'
 
 /** 安全解析 sources JSON */
@@ -48,6 +48,16 @@ export default function ChatHistory() {
     }
   }
 
+  const handleDelete = async (id: number) => {
+    try {
+      await adminApi.deleteChat(id)
+      message.success('已删除')
+      load(page)
+    } catch (e: any) {
+      message.error(e?.message || '删除失败')
+    }
+  }
+
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     {
@@ -82,9 +92,20 @@ export default function ChatHistory() {
     },
     {
       title: '操作',
-      width: 80,
+      width: 160,
       render: (_: any, record: any) => (
-        <a onClick={() => openDetail(record.id)}>查看详情</a>
+        <span onClick={(e) => e.stopPropagation()}>
+          <Button type="link" size="small" onClick={() => openDetail(record.id)}>
+            查看详情
+          </Button>
+          <Popconfirm
+            title="确定删除该问答记录？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定" cancelText="取消"
+          >
+            <Button type="link" size="small" danger>删除</Button>
+          </Popconfirm>
+        </span>
       ),
     },
   ]

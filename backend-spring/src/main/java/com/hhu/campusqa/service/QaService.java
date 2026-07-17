@@ -56,6 +56,18 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         return list(qw);
     }
 
+    /** 删除问答记录（仅所属用户可操作） */
+    public void deleteQaRecord(Long id, Long userId) {
+        QaRecord record = getById(id);
+        if (record == null) {
+            throw new BizException(400, "问答记录不存在");
+        }
+        if (!record.getUserId().equals(userId)) {
+            throw new BizException(403, "只能删除自己的问答记录");
+        }
+        removeById(id);
+    }
+
     /** 对问答记录点赞/踩（仅所属用户可操作） */
     public void updateFeedback(Long id, Long userId, Integer feedback) {
         if (feedback == null || (feedback != 1 && feedback != -1 && feedback != 0)) {
@@ -72,11 +84,12 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         updateById(record);
     }
 
-    /** 管理端：分页查询所有用户问答记录 */
-    public Page<QaRecord> pageAllQaRecords(int page, int size) {
+    /** 分页查询当前用户的问答记录 */
+    public Page<QaRecord> pageUserQaRecords(Long userId, int page, int size) {
         return this.page(
                 new Page<>(page, size),
                 new LambdaQueryWrapper<QaRecord>()
+                        .eq(QaRecord::getUserId, userId)
                         .orderByDesc(QaRecord::getCreateTime)
         );
     }
@@ -84,14 +97,14 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
     /**
      * 问答处理 — 调用 RAG 引擎，返回基于知识库的答案
      *
-     * @param userId         用户 ID（匿名时为 null）
+     * @param userId         用户 ID（所有用户包括访客都有 userId）
      * @param question       用户问题
-     * @param conversationId 会话 ID（匿名时为 null）
+     * @param conversationId 会话 ID（可为 null）
      */
     @Transactional
     public QaRecord ask(Long userId, String question, Long conversationId) {
-        // 1. 调用 RAG 引擎获取答案
-        AnswerService.AnswerResult ragResult = ragService.answer(question);
+        // 1. 调用 RAG 引擎获取答案（userId 用于文档可见性过滤）
+        AnswerService.AnswerResult ragResult = ragService.answer(question, userId);
         String answer = ragResult.answer();
         String sourceDocs;
         try {
@@ -101,26 +114,7 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
             sourceDocs = "[]";
         }
 
-        // 匿名模式：不存库，直接返回结果对象
-        if (userId == null) {
-            QaRecord record = new QaRecord();
-            record.setQuestion(question);
-            record.setAnswer(answer);
-            record.setSourceDocs(sourceDocs);
-            return record;
-        }
-
-        // 2. 保存到 qa_record（汇总表）
-        QaRecord record = QaRecord.builder()
-                .userId(userId)
-                .conversationId(conversationId)
-                .question(question)
-                .answer(answer)
-                .sourceDocs(sourceDocs)
-                .build();
-        save(record);
-
-        // 3. 如果没有传入 conversationId，自动创建新会话
+        // 2. 如果没有传入 conversationId，先创建新会话（避免后续 UPDATE 不存在的列）
         if (conversationId == null) {
             Conversation conv = Conversation.builder()
                     .userId(userId)
@@ -129,6 +123,16 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
             conversationMapper.insert(conv);
             conversationId = conv.getId();
         }
+
+        // 3. 保存到 qa_record（汇总表）——所有用户（含访客）都存库
+        QaRecord record = QaRecord.builder()
+                .userId(userId)
+                .conversationId(conversationId)
+                .question(question)
+                .answer(answer)
+                .sourceDocs(sourceDocs)
+                .build();
+        save(record);
 
         // 4. 保存用户消息
         Message userMsg = Message.builder()

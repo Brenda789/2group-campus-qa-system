@@ -45,8 +45,8 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         cleanTemporaryDocuments();
     }
 
-    /** 分页查询文档列表（支持按名称搜索、按状态筛选） */
-    public Page<KbDocument> pageDocuments(int page, int size, String keyword, String status) {
+    /** 分页查询文档列表（支持按名称搜索、按状态筛选、按可见性过滤） */
+    public Page<KbDocument> pageDocuments(int page, int size, String keyword, String status, Long userId, String userRole) {
         LambdaQueryWrapper<KbDocument> qw = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
             qw.like(KbDocument::getTitle, keyword);
@@ -54,19 +54,42 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         if (status != null && !status.isBlank()) {
             qw.eq(KbDocument::getStatus, status);
         }
+        // 所有人只能看到自己上传的文档
+        qw.eq(KbDocument::getUploadedBy, userId != null ? userId : -1);
         qw.orderByDesc(KbDocument::getCreateTime);
-        return this.page(new Page<>(page, size), qw);
+        try {
+            return this.page(new Page<>(page, size), qw);
+        } catch (Exception e) {
+            // visibility 列可能还不存在，降级为不按可见性过滤
+            log.warn("文档分页查询失败（可能 visibility 列尚未创建），降级为无过滤查询: {}", e.getMessage());
+            LambdaQueryWrapper<KbDocument> fallback = new LambdaQueryWrapper<>();
+            if (keyword != null && !keyword.isBlank()) fallback.like(KbDocument::getTitle, keyword);
+            if (status != null && !status.isBlank()) fallback.eq(KbDocument::getStatus, status);
+            fallback.orderByDesc(KbDocument::getCreateTime);
+            return this.page(new Page<>(page, size), fallback);
+        }
     }
 
-    /** 按标题关键字搜索已就绪的文档（所有用户可用） */
+    /** 按标题关键字搜索已就绪的文档（仅 PUBLIC 文档，所有用户可用） */
     public List<KbDocument> searchDocuments(String keyword) {
         LambdaQueryWrapper<KbDocument> qw = new LambdaQueryWrapper<>();
         qw.eq(KbDocument::getStatus, "READY");
+        qw.eq(KbDocument::getVisibility, "PUBLIC");
         if (StringUtils.hasText(keyword)) {
             qw.like(KbDocument::getTitle, keyword);
         }
         qw.orderByDesc(KbDocument::getCreateTime);
-        return list(qw);
+        try {
+            return list(qw);
+        } catch (Exception e) {
+            // visibility 列可能还不存在，降级为无过滤查询
+            log.warn("文档搜索查询失败（可能 visibility 列尚未创建），降级: {}", e.getMessage());
+            LambdaQueryWrapper<KbDocument> fallback = new LambdaQueryWrapper<>();
+            fallback.eq(KbDocument::getStatus, "READY");
+            if (StringUtils.hasText(keyword)) fallback.like(KbDocument::getTitle, keyword);
+            fallback.orderByDesc(KbDocument::getCreateTime);
+            return list(fallback);
+        }
     }
 
     /**
@@ -74,10 +97,11 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
      *
      * @param originalFilename 原始文件名
      * @param fileBytes        文件字节内容
-     * @param uploadedBy       上传者 ID（匿名时为 null）
+     * @param uploadedBy       上传者 ID（所有用户包括访客都有 ID）
+     * @param userRole         上传者角色（用于判断是否临时文档）
      * @return 创建的文档记录
      */
-    public KbDocument upload(String originalFilename, byte[] fileBytes, Long uploadedBy) {
+    public KbDocument upload(String originalFilename, byte[] fileBytes, Long uploadedBy, String userRole) {
         String fileType = getFileType(originalFilename);
         String storedName = UUID.randomUUID().toString() + "." + fileType;
         Path targetPath = Paths.get(UPLOAD_DIR, storedName);
@@ -90,7 +114,7 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
             throw new BizException(500, "文件保存失败");
         }
 
-        boolean isAnonymous = (uploadedBy == null);
+        boolean isTemporary = "guest".equals(userRole);
 
         KbDocument doc = KbDocument.builder()
                 .title(originalFilename)
@@ -99,7 +123,8 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
                 .chunkCount(0)
                 .status("PROCESSING")
                 .uploadedBy(uploadedBy)
-                .isTemporary(isAnonymous)
+                .isTemporary(isTemporary)
+                .visibility("PRIVATE")  // 默认私有
                 .build();
         save(doc);
 

@@ -50,12 +50,12 @@ const features = [
 /** 前台门户首页 + 浮动问答机器人
  *
  *  支持两种模式：
- *  - 访客（未登录）：问答正常使用，会话记录存在浏览器内存中，刷新页面后消失
+ *  - 访客（未登录）：自动获取访客 token，问答记录存入数据库，关闭页面后自动清理
  *  - 登录用户：会话记录持久化到后端，刷新不丢失
  */
 export default function HomePage() {
   const navigate = useNavigate()
-  const { isLoggedIn, user, logout } = useAuth()
+  const { isLoggedIn, user, isGuest, token, logout } = useAuth()
   const [chatOpen, setChatOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -68,24 +68,36 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
 
-  // ======== 访客模式：本地会话存储（刷新即消失） ========
-  const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
-  const [guestNextId, setGuestNextId] = useState(1)
-
   // 自动滚动到底部
   useEffect(() => {
     msgEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // 访客关闭/刷新页面时清理数据：先清 sessionStorage 再发删除请求，避免竞态条件
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!isGuest) return
+      const guestToken = window.sessionStorage.getItem('token')
+      if (!guestToken) return
+      // 关键：先清除 sessionStorage，再发删除请求
+      // 这样刷新后新页面不会读到旧 token，杜绝竞态
+      window.sessionStorage.removeItem('token')
+      window.sessionStorage.removeItem('user')
+      fetch('http://localhost:8000/api/auth/guest', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${guestToken}` },
+        keepalive: true,
+      })
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isGuest])
+
   // 打开聊天窗口时加载会话列表
   useEffect(() => {
     if (!chatOpen) return
-    if (isLoggedIn) {
-      loadConversationsFromApi()
-    } else {
-      loadConversationsFromLocal()
-    }
-  }, [chatOpen, isLoggedIn])
+    loadConversationsFromApi()
+  }, [chatOpen])
 
   // ==================== 会话列表 ====================
 
@@ -96,20 +108,8 @@ export default function HomePage() {
     } catch { /* 静默失败 */ }
   }
 
-  const loadConversationsFromLocal = () => {
-    const list: ConvItem[] = Object.entries(guestConvs).map(([id, msgs]) => {
-      const firstUser = msgs.find(m => m.role === 'user')
-      const title = firstUser
-        ? (firstUser.content.length > 30 ? firstUser.content.substring(0, 30) + '...' : firstUser.content)
-        : '新会话'
-      return { id: Number(id), title }
-    })
-    setConversations(list)
-  }
-
   const loadConversations = () => {
-    if (isLoggedIn) loadConversationsFromApi()
-    else loadConversationsFromLocal()
+    loadConversationsFromApi()
   }
 
   // ==================== 消息加载 ====================
@@ -132,10 +132,6 @@ export default function HomePage() {
     }
   }
 
-  const loadMessagesFromLocal = (convId: number) => {
-    setMessages(guestConvs[convId] || [])
-  }
-
   // ==================== 发送消息 ====================
 
   const send = async (text: string) => {
@@ -145,7 +141,13 @@ export default function HomePage() {
     setMessages((prev) => [...prev, { role: 'user', content: q }])
     setLoading(true)
     try {
-      const res: any = await chatApi.ask(q, isLoggedIn ? (activeConvId ?? undefined) : undefined)
+      const res: any = await chatApi.ask(q, activeConvId ?? undefined)
+
+      // 如果后端返回了访客 token（后端兜底创建了访客），保存到 sessionStorage
+      if (res.guestToken) {
+        window.sessionStorage.setItem('token', res.guestToken)
+        window.sessionStorage.setItem('user', JSON.stringify({ username: '访客', role: 'guest' }))
+      }
 
       const assistantMsg: Message = {
         role: 'assistant',
@@ -153,29 +155,11 @@ export default function HomePage() {
         sources: safeParseSources(res.sourceDocs),
       }
 
-      if (isLoggedIn) {
-        // ---- 登录用户：后端持久化 ----
-        setMessages((prev) => [...prev, assistantMsg])
-        if (!activeConvId && res.conversationId) {
-          setActiveConvId(res.conversationId)
-        }
-        loadConversationsFromApi()
-      } else {
-        // ---- 访客：本地存储 ----
-        let convId = activeConvId
-        if (convId === null) {
-          // 新会话
-          convId = guestNextId
-          setGuestNextId((n) => n + 1)
-          setActiveConvId(convId)
-        }
-        setGuestConvs((prev) => {
-          const existing = prev[convId!] || []
-          return { ...prev, [convId!]: [...existing, { role: 'user', content: q }, assistantMsg] }
-        })
-        setMessages((prev) => [...prev, assistantMsg])
-        loadConversationsFromLocal()
+      setMessages((prev) => [...prev, assistantMsg])
+      if (!activeConvId && res.conversationId) {
+        setActiveConvId(res.conversationId)
       }
+      loadConversationsFromApi()
     } catch {
       message.error('发送失败，请稍后重试')
     } finally {
@@ -187,11 +171,7 @@ export default function HomePage() {
 
   const selectConversation = (convId: number) => {
     setActiveConvId(convId)
-    if (isLoggedIn) {
-      loadMessagesFromApi(convId)
-    } else {
-      loadMessagesFromLocal(convId)
-    }
+    loadMessagesFromApi(convId)
   }
 
   const newConversation = () => {
@@ -200,30 +180,16 @@ export default function HomePage() {
   }
 
   const deleteConversation = async (convId: number) => {
-    if (isLoggedIn) {
-      try {
-        await chatApi.deleteConversation(convId)
-        message.success('已删除')
-        if (activeConvId === convId) {
-          setActiveConvId(null)
-          setMessages([])
-        }
-        loadConversationsFromApi()
-      } catch {
-        message.error('删除失败')
-      }
-    } else {
-      // 访客：直接从本地移除
-      setGuestConvs((prev) => {
-        const next = { ...prev }
-        delete next[convId]
-        return next
-      })
+    try {
+      await chatApi.deleteConversation(convId)
+      message.success('已删除')
       if (activeConvId === convId) {
         setActiveConvId(null)
         setMessages([])
       }
-      loadConversationsFromLocal()
+      loadConversationsFromApi()
+    } catch {
+      message.error('删除失败')
     }
   }
 
@@ -413,7 +379,7 @@ export default function HomePage() {
               <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 14 }}>
                 基于大语言模型的校园智能问答系统，覆盖校内办事指南、教务政策、生活服务等高频问题。
                 点击右下角机器人图标开始提问。
-                {!isLoggedIn && ' 登录后可永久保存问答记录。'}
+                {isGuest && ' 登录后可永久保存问答记录。'}
               </Paragraph>
               <Space wrap>
                 {QUICK_QUESTIONS.map((q) => (
@@ -506,12 +472,12 @@ export default function HomePage() {
                 fontSize: 15, color: '#fff',
               }}><RobotOutlined /></span>
               <span style={{ fontWeight: 700, fontSize: 15 }}>河海问答助手</span>
-              {!isLoggedIn && (
+              {isGuest && (
                 <Tag style={{
                   borderRadius: 10, fontSize: 10, border: '1px solid #fbbf24',
                   background: '#fef3c7', color: '#92400e',
                 }}>
-                  访客模式 · 刷新后记录消失
+                  访客模式 · 关闭页面后记录自动清理
                 </Tag>
               )}
             </Space>
@@ -556,9 +522,9 @@ export default function HomePage() {
               >
                 新对话
               </Button>
-              {!isLoggedIn && (
+              {isGuest && (
                 <div style={{ textAlign: 'center', color: '#bbb', fontSize: 11, marginTop: 6 }}>
-                  💡 登录后可永久保存
+                  💡 登录后可永久保存记录
                 </div>
               )}
             </div>
@@ -725,18 +691,25 @@ export default function HomePage() {
       >
         <p style={{ color: '#999', marginBottom: 16 }}>
           支持 PDF / DOCX / TXT / MD，最大 10MB
-          {!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}
+          {isGuest && '。访客上传的文档将在关闭页面后自动清理'}
         </p>
-        <Upload
+        <Upload.Dragger
           beforeUpload={() => false}
           onChange={handleUpload}
           showUploadList={false}
           accept=".pdf,.docx,.doc,.txt,.md"
+          style={{ padding: '24px 0' }}
         >
-          <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
-            选择文件上传
-          </Button>
-        </Upload>
+          <p className="ant-upload-drag-icon">
+            <UploadOutlined style={{ fontSize: 40, color: '#005BAC' }} />
+          </p>
+          <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>
+            可将上传文件拖拽至此
+          </p>
+          <p className="ant-upload-hint" style={{ color: '#999' }}>
+            或点击此处选择文件上传
+          </p>
+        </Upload.Dragger>
       </Modal>
     </div>
   )

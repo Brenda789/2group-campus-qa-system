@@ -9,6 +9,7 @@ const { Title, Text } = Typography
 export default function UserList() {
   const { role } = useAuth()
   const isAdmin = role === 'admin'
+  const currentUsername = useAuth().user.username
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -40,13 +41,18 @@ export default function UserList() {
     load(1, '')
   }, [])
 
-  const handleToggle = async (userId: number, newStatus: number) => {
+  const handleToggle = async (userId: number, newStatus: number, record: any) => {
+    // 管理员不能停用自己的账号（前端拦截 + 后端校验双重保护）
+    if (record.username === currentUsername) {
+      message.error('不能停用自己的账号')
+      return
+    }
     try {
       await userApi.toggleStatus(userId, newStatus)
       message.success(newStatus === 1 ? '已启用该用户' : '已禁用该用户')
       load(page, keyword)
-    } catch {
-      message.error('操作失败')
+    } catch (e: any) {
+      message.error(e?.message || '操作失败')
     }
   }
 
@@ -55,8 +61,17 @@ export default function UserList() {
       await userApi.remove(userId)
       message.success('删除成功')
       load(page, keyword)
-    } catch {
-      message.error('删除失败')
+    } catch (e: any) {
+      message.error(e?.message || '删除失败')
+    }
+  }
+
+  const handleResetPassword = async (userId: number) => {
+    try {
+      await userApi.resetPassword(userId)
+      message.success('密码已重置为 admin123')
+    } catch (e: any) {
+      message.error(e?.message || '重置密码失败')
     }
   }
 
@@ -136,7 +151,7 @@ export default function UserList() {
         isAdmin ? (
           <Popconfirm
             title={status === 1 ? '确定禁用该用户？' : '确定启用该用户？'}
-            onConfirm={() => handleToggle(record.id, status === 1 ? 0 : 1)}
+            onConfirm={() => handleToggle(record.id, status === 1 ? 0 : 1, record)}
             okText="确定"
             cancelText="取消"
           >
@@ -169,7 +184,12 @@ export default function UserList() {
               <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
                 编辑
               </Button>
-              {record.username !== 'admin' && (
+              {record.username !== currentUsername && (
+                <Popconfirm title="确定重置该用户密码为 admin123？" onConfirm={() => handleResetPassword(record.id)} okText="确定" cancelText="取消">
+                  <Button type="link" size="small">重置密码</Button>
+                </Popconfirm>
+              )}
+              {record.username !== currentUsername && (
                 <Popconfirm title="确定删除该用户？此操作不可恢复" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
                   <Button type="link" size="small" danger>删除</Button>
                 </Popconfirm>

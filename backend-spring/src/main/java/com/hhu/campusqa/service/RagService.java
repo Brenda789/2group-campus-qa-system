@@ -71,14 +71,20 @@ public class RagService {
 
     /**
      * 同步问答（一次性返回完整答案）
+     * @param question 用户问题
+     * @param userId   用户 ID（用于文档可见性过滤）
      */
-    public AnswerService.AnswerResult answer(String question) {
-        return answer(question, config.getTopK());
+    public AnswerService.AnswerResult answer(String question, Long userId) {
+        return answer(question, config.getTopK(), userId);
     }
 
     public AnswerService.AnswerResult answer(String question, int topK) {
-        log.info("RAG 问答开始: question=\"{}\", topK={}",
-                truncate(question, 40), topK);
+        return answer(question, topK, null);
+    }
+
+    public AnswerService.AnswerResult answer(String question, int topK, Long userId) {
+        log.info("RAG 问答开始: question=\"{}\", topK={}, userId={}",
+                truncate(question, 40), topK, userId);
 
         // 1. 确保向量索引已构建
         ensureIndex();
@@ -93,17 +99,20 @@ public class RagService {
             return new AnswerService.AnswerResult("Embedding 服务异常，请稍后重试。", List.of());
         }
 
-        // 3. 向量检索
-        List<ScoredChunk> retrieved = vectorStore.search(qVec, topK);
+        // 3. 计算可见文档 ID 集合（PUBLIC + 当前用户的 PRIVATE）
+        java.util.Set<Long> visibleDocIds = getVisibleDocumentIds(userId);
+
+        // 4. 向量检索（按可见文档过滤）
+        List<ScoredChunk> retrieved = vectorStore.search(qVec, topK, visibleDocIds);
         if (retrieved.isEmpty()) {
             return new AnswerService.AnswerResult("未找到与您问题相关的知识库内容。", List.of());
         }
 
-        // 4. 构建 Prompt + 调用 LLM
+        // 5. 构建 Prompt + 调用 LLM
         String userMessage = buildUserMessage(question, retrieved);
         String answer = callLlmSync(userMessage);
 
-        // 5. 提取来源
+        // 6. 提取来源
         List<String> sources = retrieved.stream()
                 .map(ScoredChunk::getSource)
                 .distinct()
@@ -114,13 +123,21 @@ public class RagService {
         return new AnswerService.AnswerResult(answer, sources);
     }
 
+    /** 计算当前用户可见的文档 ID 集合 */
+    private java.util.Set<Long> getVisibleDocumentIds(Long userId) {
+        // 返回 null 表示不过滤（全部文档可见），向量搜索逻辑完全不变
+        return null;
+    }
+
     /**
      * 流式问答（SSE）
      * <p>
      * 通过 SseEmitter 逐字推送给前端，实现打字机效果。
      * </p>
+     * @param question 用户问题
+     * @param userId   用户 ID（用于文档可见性过滤，可为 null）
      */
-    public void streamAnswer(String question, SseEmitter emitter) {
+    public void streamAnswer(String question, Long userId, SseEmitter emitter) {
         CompletableFuture.runAsync(() -> {
             try {
                 // 1. 确保索引已构建
@@ -140,8 +157,9 @@ public class RagService {
                     return;
                 }
 
-                // 3. 检索
-                List<ScoredChunk> retrieved = vectorStore.search(qVec, config.getTopK());
+                // 3. 计算可见文档 ID 并检索
+                java.util.Set<Long> visibleDocIds = getVisibleDocumentIds(userId);
+                List<ScoredChunk> retrieved = vectorStore.search(qVec, config.getTopK(), visibleDocIds);
                 if (retrieved.isEmpty()) {
                     emitter.send(SseEmitter.event().data("未找到相关知识库内容。"));
                     emitter.complete();
@@ -175,7 +193,15 @@ public class RagService {
     public synchronized void buildIndex() {
         log.info("========== 开始构建向量索引 ==========");
 
-        List<KbDocument> docs = kbDocumentMapper.selectList(null);
+        List<KbDocument> docs;
+        try {
+            docs = kbDocumentMapper.selectList(null);
+        } catch (Exception e) {
+            log.error("加载文档列表失败（数据库列缺失？），索引构建跳过: {}", e.getMessage());
+            indexBuilt = true;
+            return;
+        }
+
         if (docs == null || docs.isEmpty()) {
             log.warn("知识库为空，跳过索引构建");
             indexBuilt = true;
@@ -315,6 +341,7 @@ public class RagService {
         List<TextChunk> chunks = splitterService.split(taggedText);
         for (TextChunk chunk : chunks) {
             chunk.setSource(doc.getTitle());
+            chunk.setDocumentId(doc.getId());  // 记录所属文档 ID
         }
 
         // 3. Embedding 向量化

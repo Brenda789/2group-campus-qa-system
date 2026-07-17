@@ -113,6 +113,23 @@ public class AuthController {
         }
     }
 
+    /** 访客登录：自动创建访客账号，返回 token */
+    @PostMapping("/guest")
+    public Result<?> guestLogin() {
+        return Result.success(sysUserService.createGuestUser());
+    }
+
+    /** 访客登出：清理访客用户及其所有关联数据（页面关闭时调用） */
+    @DeleteMapping("/guest")
+    public Result<Void> guestLogout(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        if (userId != null && "guest".equals(role)) {
+            sysUserService.cleanupGuestUser(userId);
+        }
+        return Result.success();
+    }
+
     /** 获取客户端真实 IP */
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");

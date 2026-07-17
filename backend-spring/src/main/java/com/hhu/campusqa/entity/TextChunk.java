@@ -29,6 +29,9 @@ public class TextChunk {
     /** 来源文档标题（从 [来源：xxx] 标记提取，无标记则为"未知来源"） */
     private String source;
 
+    /** 所属文档数据库 ID（用于权限过滤，匿名/临时文档可为 null） */
+    private Long documentId;
+
     /** 切片文本内容 */
     private String text;
 }

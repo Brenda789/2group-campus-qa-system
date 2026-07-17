@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography } from 'antd'
+import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography, Modal } from 'antd'
 import { UploadOutlined, ReloadOutlined, SearchOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { docApi, adminApi } from '../api'
 
@@ -38,6 +38,7 @@ export default function DocumentManage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
   const [keyword, setKeyword] = useState('')
@@ -77,9 +78,10 @@ export default function DocumentManage() {
     try {
       await docApi.upload(file)
       message.success('上传成功，正在处理')
+      setUploadOpen(false)
       load(1)
-    } catch {
-      message.error('上传失败')
+    } catch (e: any) {
+      message.error(e?.message || '上传失败')
     } finally {
       setUploading(false)
     }
@@ -102,6 +104,17 @@ export default function DocumentManage() {
       load(page)
     } catch {
       message.error('重新处理失败')
+    }
+  }
+
+  const handleVisibility = async (id: number, current: string) => {
+    const newVis = current === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC'
+    try {
+      await docApi.setVisibility(id, newVis as 'PUBLIC' | 'PRIVATE')
+      message.success(`已设为${newVis === 'PUBLIC' ? '公开' : '私有'}`)
+      load(page)
+    } catch {
+      message.error('操作失败')
     }
   }
 
@@ -163,6 +176,20 @@ export default function DocumentManage() {
     },
     { title: '切块数', dataIndex: 'chunkCount' },
     {
+      title: '可见性',
+      dataIndex: 'visibility',
+      width: 100,
+      render: (v: string, record: any) => (
+        <Tag
+          color={v === 'PUBLIC' ? 'blue' : 'default'}
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleVisibility(record.id, v || 'PRIVATE')}
+        >
+          {v === 'PUBLIC' ? '公开' : '私有'}
+        </Tag>
+      ),
+    },
+    {
       title: '操作',
       render: (_: any, record: any) => (
         <Space size="small">
@@ -196,18 +223,12 @@ export default function DocumentManage() {
           <Text type="secondary">管理文档切片，构建问答知识库</Text>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Upload
-            beforeUpload={() => false}
-            onChange={handleUpload}
-            showUploadList={false}
-            accept=".pdf,.docx,.doc,.txt,.md"
+          <Button type="primary" icon={<UploadOutlined />} size="large"
+            style={{ borderRadius: 10, fontWeight: 600, height: 42 }}
+            onClick={() => setUploadOpen(true)}
           >
-            <Button type="primary" icon={<UploadOutlined />} loading={uploading} size="large"
-              style={{ borderRadius: 10, fontWeight: 600, height: 42 }}
-            >
-              上传文档
-            </Button>
-          </Upload>
+            上传文档
+          </Button>
           <Button
             icon={<ReloadOutlined />}
             loading={rebuilding}
@@ -259,6 +280,36 @@ export default function DocumentManage() {
           }}
         />
       </Card>
+
+      {/* 上传文档 Modal */}
+      <Modal
+        title="上传文档到知识库"
+        open={uploadOpen}
+        onCancel={() => setUploadOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <p style={{ color: '#999', marginBottom: 16 }}>
+          支持 PDF / DOCX / TXT / MD，最大 10MB
+        </p>
+        <Upload.Dragger
+          beforeUpload={() => false}
+          onChange={handleUpload}
+          showUploadList={false}
+          accept=".pdf,.docx,.doc,.txt,.md"
+          style={{ padding: '24px 0' }}
+        >
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined style={{ fontSize: 40, color: '#005BAC' }} />
+          </p>
+          <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>
+            可将上传文件拖拽至此
+          </p>
+          <p className="ant-upload-hint" style={{ color: '#999' }}>
+            或点击此处选择文件上传
+          </p>
+        </Upload.Dragger>
+      </Modal>
     </>
   )
 }

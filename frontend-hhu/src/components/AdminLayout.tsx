@@ -37,6 +37,7 @@ export default function AdminLayout() {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users'
     if (location.pathname.startsWith('/admin/documents')) return '/admin/documents'
     if (location.pathname.startsWith('/admin/chat')) return '/admin/chat'
+    if (location.pathname.startsWith('/admin/profile')) return '/admin/profile'
     return '/admin'
   }
 
@@ -49,6 +50,7 @@ export default function AdminLayout() {
           { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
         ]
       : []),
+    { key: '/admin/profile', icon: <UserOutlined />, label: '个人管理' },
   ]
 
   const handleMenuClick = ({ key }: { key: string }) => navigate(key)

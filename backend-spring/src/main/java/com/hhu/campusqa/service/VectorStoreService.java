@@ -75,11 +75,12 @@ public class VectorStoreService {
     /**
      * 余弦相似度检索 TopK
      *
-     * @param queryVector 问题向量
-     * @param topK        返回数量
+     * @param queryVector      问题向量
+     * @param topK             返回数量
+     * @param visibleDocIds    可见文档 ID 集合（null 表示不过滤）
      * @return 带相似度分数的文本块列表
      */
-    public List<ScoredChunk> search(float[] queryVector, int topK) {
+    public List<ScoredChunk> search(float[] queryVector, int topK, java.util.Set<Long> visibleDocIds) {
         if (queryVector == null || queryVector.length == 0 || chunks.isEmpty()) {
             return List.of();
         }
@@ -93,8 +94,8 @@ public class VectorStoreService {
         // 按分数降序排列
         sims.sort((a, b) -> Double.compare(b.score, a.score));
 
-        // 取 TopK
-        int limit = Math.min(topK, sims.size());
+        // 取 TopK，可选按文档 ID 过滤
+        int limit = Math.min(topK * 3, sims.size()); // 多取一些，过滤后再截断
         return sims.subList(0, limit).stream()
                 .filter(s -> s.score > 0)
                 .map(s -> {
@@ -103,10 +104,21 @@ public class VectorStoreService {
                             .id(chunk.getId())
                             .text(chunk.getText())
                             .source(chunk.getSource())
+                            .documentId(chunk.getDocumentId())
                             .score(s.score)
                             .build();
                 })
+                .filter(sc -> visibleDocIds == null || sc.getDocumentId() == null
+                        || visibleDocIds.contains(sc.getDocumentId()))
+                .limit(topK)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 余弦相似度检索 TopK（不过滤文档）
+     */
+    public List<ScoredChunk> search(float[] queryVector, int topK) {
+        return search(queryVector, topK, null);
     }
 
     /** 向量库条目数 */

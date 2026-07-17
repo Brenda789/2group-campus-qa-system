@@ -23,6 +23,26 @@ export const authApi = {
    */
   register: (username: string, password: string, email: string) =>
     request.post('/auth/register', { username, password, email }),
+
+  /** 访客登录 → 自动创建访客账号，返回 { token, username, role, userId } */
+  guestLogin: () => request.post('/auth/guest'),
+
+  /** 访客登出 → 清理访客数据（页面关闭时调用） */
+  guestLogout: () => request.delete('/auth/guest'),
+}
+
+// ==================== 个人管理 ====================
+export const profileApi = {
+  /** 修改密码 */
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request.put('/user/password', { oldPassword, newPassword }),
+
+  /** 修改个人信息（邮箱） */
+  updateProfile: (email: string) =>
+    request.put('/user/profile', { email }),
+
+  /** 获取当前用户信息 */
+  me: () => request.get('/user/me'),
 }
 
 // ==================== 用户管理 ====================
@@ -44,10 +64,15 @@ export const userApi = {
   toggleStatus: (userId: number, status: number) =>
     request.put(`/user/${userId}/status`, { status }),
 
-  /** 删除用户（软删除）
+  /** 删除用户（硬删除）
    *  不设 mock 降级——写操作必须透传后端错误。 */
   remove: (userId: number) =>
     request.delete(`/user/${userId}`),
+
+  /** 管理员重置用户密码为 admin123
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  resetPassword: (userId: number) =>
+    request.put(`/user/${userId}/reset-password`),
 
   /** 编辑用户信息（邮箱、角色）
    *  不设 mock 降级——写操作必须透传后端错误。 */
@@ -65,8 +90,8 @@ export const userApi = {
 export const chatApi = {
   /** 提问 → QaRecord */
   ask: (question: string, conversationId?: number) =>
-    request.post('/chat/ask', { question, conversationId }).catch(() => {
-      console.warn(`${MOCK_PREFIX} chat ask fallback`)
+    request.post('/chat/ask', { question, conversationId }).catch((err: any) => {
+      console.error('chat ask 失败:', err?.message || err, err?.response?.data || '')
       return {
         id: Date.now(),
         question,
@@ -126,6 +151,10 @@ export const docApi = {
 
   /** 重新处理单个文档 */
   reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
+
+  /** 修改文档可见性（仅管理员） */
+  setVisibility: (id: number, visibility: 'PUBLIC' | 'PRIVATE') =>
+    request.put(`/documents/${id}/visibility`, { visibility }),
 }
 
 // ==================== 管理后台（Admin） ====================
@@ -147,6 +176,9 @@ export const adminApi = {
       console.warn(`${MOCK_PREFIX} admin chatDetail fallback id=${id}`)
       throw new Error('后端未连接，无法查看详情')
     }),
+
+  /** 删除自己的问答记录 */
+  deleteChat: (id: number) => request.delete(`/admin/chat/${id}`),
 
   /** 重建向量索引
    *  不设 mock 降级——写操作必须透传后端错误。 */

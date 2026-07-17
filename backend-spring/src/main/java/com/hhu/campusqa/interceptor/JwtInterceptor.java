@@ -26,7 +26,8 @@ public class JwtInterceptor implements HandlerInterceptor {
     private static final java.util.Set<String> OPTIONAL_AUTH_PATHS = java.util.Set.of(
             "/api/chat/ask",
             "/api/chat/stream",
-            "/api/documents"
+            "/api/documents",
+            "/api/auth/guest"
     );
 
     @Override

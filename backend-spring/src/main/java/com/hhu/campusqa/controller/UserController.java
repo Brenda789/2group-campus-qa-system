@@ -61,26 +61,37 @@ public class UserController {
         return Result.success();
     }
 
-    /** 启停用户 */
+    /** 启停用户（管理员不能停用自己的账号） */
     @PutMapping("/{id}/status")
     public Result<Void> toggleStatus(@PathVariable Long id,
                                       @RequestBody Map<String, Integer> body,
                                       HttpServletRequest request) {
         checkAdmin(request);
+        Long operatorId = (Long) request.getAttribute("userId");
         Integer status = body.get("status");
         if (status == null || (status != 0 && status != 1)) {
             throw new BizException(400, "status 必须为 0 或 1");
         }
-        sysUserService.toggleUserStatus(id, status);
+        sysUserService.toggleUserStatus(id, status, operatorId);
         return Result.success();
     }
 
-    /** 删除用户（软删除） */
+    /** 删除用户（硬删除，直接从数据库移除；管理员不能删除自己，可以删除其他管理员） */
     @DeleteMapping("/{id}")
     public Result<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
         checkAdmin(request);
-        // 软删除：将 status 设为 0
-        sysUserService.toggleUserStatus(id, 0);
+        Long operatorId = (Long) request.getAttribute("userId");
+        sysUserService.hardDeleteUser(id, operatorId);
+        return Result.success();
+    }
+
+    /** 管理员重置用户密码为 "admin123"（不能重置自己的密码） */
+    @PutMapping("/{id}/reset-password")
+    public Result<Void> resetPassword(@PathVariable Long id,
+                                       HttpServletRequest request) {
+        checkAdmin(request);
+        Long operatorId = (Long) request.getAttribute("userId");
+        sysUserService.resetUserPassword(id, operatorId);
         return Result.success();
     }
 

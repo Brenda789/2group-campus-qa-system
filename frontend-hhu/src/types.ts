@@ -25,7 +25,7 @@ export interface PageResult<T> {
 export interface LoginResult {
   token: string
   username: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'guest'
 }
 
 export interface RegisterResult {

@@ -39,8 +39,11 @@ public class KbDocument {
     /** 上传者 ID（匿名上传时为 null） */
     private Long uploadedBy;
 
-    /** 是否临时文档（匿名上传），服务重启后清理 */
+    /** 是否临时文档（匿名/访客上传），服务重启或会话结束时清理 */
     private Boolean isTemporary;
+
+    /** 文档可见性：PUBLIC（所有人可用）/ PRIVATE（仅上传者可用） */
+    private String visibility;
 
     /** 处理失败时的错误信息 */
     private String errorMessage;

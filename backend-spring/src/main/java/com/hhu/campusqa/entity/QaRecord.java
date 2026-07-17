@@ -41,4 +41,8 @@ public class QaRecord {
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    /** 访客 token（仅当请求无 token 后端自动创建访客时返回，不存入数据库） */
+    @TableField(exist = false)
+    private String guestToken;
 }

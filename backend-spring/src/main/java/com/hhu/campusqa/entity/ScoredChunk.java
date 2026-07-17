@@ -23,6 +23,9 @@ public class ScoredChunk {
     /** 来源文档 */
     private String source;
 
+    /** 所属文档数据库 ID（用于权限过滤） */
+    private Long documentId;
+
     /** 相似度分数（0~1，越高越相关） */
     private double score;
 }

@@ -12,9 +12,10 @@ const request = axios.create({
   timeout: 10000,
 })
 
-// ==================== 请求拦截：自动带 token ====================
+// ==================== 请求拦截：自动带 token（同时检查 localStorage 和 sessionStorage） ====================
 request.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem('token')
+  // 登录用户 token 存在 localStorage，访客 token 存在 sessionStorage
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
   if (token) {
     cfg.headers.Authorization = `Bearer ${token}`
   }
@@ -34,16 +35,22 @@ request.interceptors.response.use(
   },
   (err) => {
     if (err.response?.status === 401) {
-      // 只在已登录用户 token 过期时才跳转登录页
-      // 匿名用户访问需要登录的接口时静默失败
-      const token = localStorage.getItem('token')
-      if (token) {
+      // 清理过期 token（localStorage 登录用户 / sessionStorage 访客）
+      const localToken = localStorage.getItem('token')
+      const sessionToken = sessionStorage.getItem('token')
+      if (localToken) {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
         localStorage.removeItem('role')
         if (!window.location.hash.includes('login')) {
           window.location.hash = '#/login'
         }
+      }
+      if (sessionToken) {
+        // 访客 token 过期，清除后刷新页面重新获取
+        sessionStorage.removeItem('token')
+        sessionStorage.removeItem('user')
+        window.location.reload()
       }
     }
     return Promise.reject(err)

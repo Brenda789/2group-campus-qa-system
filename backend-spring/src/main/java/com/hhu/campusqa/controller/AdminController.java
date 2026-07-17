@@ -61,25 +61,34 @@ public class AdminController {
         return Result.success(data);
     }
 
-    /** 全量问答记录（分页） */
+    /** 我的问答记录（分页，仅查看自己的） */
     @GetMapping("/chat/history")
     public Result<Page<QaRecord>> chatHistory(@RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "10") int size,
                                               HttpServletRequest request) {
-        checkAdmin(request);
-        return Result.success(qaService.pageAllQaRecords(page, size));
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.success(qaService.pageUserQaRecords(userId, page, size));
     }
 
     /** 单条问答详情 */
     @GetMapping("/chat/{id}")
     public Result<QaRecord> chatDetail(@PathVariable Long id,
                                        HttpServletRequest request) {
-        checkAdmin(request);
+        Long userId = (Long) request.getAttribute("userId");
         QaRecord record = qaService.getById(id);
-        if (record == null) {
+        if (record == null || !record.getUserId().equals(userId)) {
             throw new BizException(404, "问答记录不存在");
         }
         return Result.success(record);
+    }
+
+    /** 删除自己的问答记录 */
+    @DeleteMapping("/chat/{id}")
+    public Result<Void> deleteChat(@PathVariable Long id,
+                                    HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        qaService.deleteQaRecord(id, userId);
+        return Result.success();
     }
 
     /** 重建向量索引（处理所有待处理文档） */

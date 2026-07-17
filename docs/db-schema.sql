@@ -32,8 +32,11 @@ CREATE TABLE IF NOT EXISTS kb_document (
     file_type   VARCHAR(20)   NOT NULL                COMMENT '文件类型：pdf / docx / txt / md',
     chunk_count INT           DEFAULT 0               COMMENT '切分块数',
     status      VARCHAR(20)   DEFAULT 'PROCESSING'    COMMENT '处理状态：PROCESSING / READY / ERROR',
-    uploaded_by BIGINT        DEFAULT NULL            COMMENT '上传者 ID',
-    create_time DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+    uploaded_by  BIGINT        DEFAULT NULL            COMMENT '上传者 ID',
+    is_temporary BOOLEAN       DEFAULT FALSE           COMMENT '是否临时文档（匿名上传），服务重启后清理',
+    visibility   VARCHAR(20)   DEFAULT 'PRIVATE'        COMMENT '文档可见性：PUBLIC / PRIVATE',
+    error_message VARCHAR(500) DEFAULT NULL            COMMENT '处理失败时的错误信息',
+    create_time  DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档表';
 
 -- -----------------------------------------------------------

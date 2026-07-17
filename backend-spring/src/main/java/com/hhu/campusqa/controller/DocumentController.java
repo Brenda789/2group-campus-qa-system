@@ -5,6 +5,7 @@ import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.common.Result;
 import com.hhu.campusqa.entity.KbDocument;
 import com.hhu.campusqa.service.KbDocumentService;
+import com.hhu.campusqa.service.SysUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,18 +27,23 @@ public class DocumentController {
     private static final List<String> ALLOWED_TYPES = List.of("pdf", "doc", "docx", "txt", "md");
 
     private final KbDocumentService kbDocumentService;
+    private final SysUserService sysUserService;
 
-    public DocumentController(KbDocumentService kbDocumentService) {
+    public DocumentController(KbDocumentService kbDocumentService, SysUserService sysUserService) {
         this.kbDocumentService = kbDocumentService;
+        this.sysUserService = sysUserService;
     }
 
-    /** 文档分页列表（支持按名称搜索、按状态筛选） */
+    /** 文档分页列表（支持按名称搜索、按状态筛选，普通用户只能看到 PUBLIC + 自己的文档） */
     @GetMapping
     public Result<Page<KbDocument>> list(@RequestParam(defaultValue = "1") int page,
                                           @RequestParam(defaultValue = "10") int size,
                                           @RequestParam(required = false) String keyword,
-                                          @RequestParam(required = false) String status) {
-        return Result.success(kbDocumentService.pageDocuments(page, size, keyword, status));
+                                          @RequestParam(required = false) String status,
+                                          HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        return Result.success(kbDocumentService.pageDocuments(page, size, keyword, status, userId, role));
     }
 
     /** 公开搜索知识库文档（所有登录用户可用，仅返回已就绪的文档） */
@@ -46,7 +52,7 @@ public class DocumentController {
         return Result.success(kbDocumentService.searchDocuments(keyword));
     }
 
-    /** 上传文档文件（所有人可用；匿名上传为临时文档，服务重启后清理） */
+    /** 上传文档文件（需要登录或访客身份） */
     @PostMapping
     public Result<KbDocument> upload(@RequestParam("file") MultipartFile file,
                                       HttpServletRequest request) {
@@ -70,12 +76,26 @@ public class DocumentController {
             throw new BizException(400, "文件大小不能超过 10MB");
         }
 
+        // 用户身份检查：无 token 或用户已被清理时自动创建访客
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        if (userId != null) {
+            try {
+                if (sysUserService.getById(userId) == null) userId = null;
+            } catch (Exception ignored) { userId = null; }
+        }
+        if (userId == null) {
+            java.util.Map<String, Object> guest = sysUserService.createGuestUser();
+            userId = (Long) guest.get("userId");
+            role = "guest";
+        }
+
         try {
-            Long userId = (Long) request.getAttribute("userId");
             KbDocument doc = kbDocumentService.upload(
                     file.getOriginalFilename(),
                     file.getBytes(),
-                    userId
+                    userId,
+                    role
             );
             return Result.success(doc);
         } catch (IOException e) {
@@ -101,6 +121,25 @@ public class DocumentController {
         }
         kbDocumentService.reprocessDocument(doc);
         return Result.success(kbDocumentService.getById(id));
+    }
+
+    /** 修改文档可见性（仅管理员） */
+    @PutMapping("/{id}/visibility")
+    public Result<Void> setVisibility(@PathVariable Long id,
+                                      @RequestBody java.util.Map<String, String> body,
+                                      HttpServletRequest request) {
+        checkAdmin(request);
+        String visibility = body.get("visibility");
+        if (visibility == null || (!"PUBLIC".equals(visibility) && !"PRIVATE".equals(visibility))) {
+            throw new BizException(400, "visibility 必须为 PUBLIC 或 PRIVATE");
+        }
+        KbDocument doc = kbDocumentService.getById(id);
+        if (doc == null) {
+            throw new BizException(404, "文档不存在");
+        }
+        doc.setVisibility(visibility);
+        kbDocumentService.updateById(doc);
+        return Result.success();
     }
 
     private void checkAdmin(HttpServletRequest request) {

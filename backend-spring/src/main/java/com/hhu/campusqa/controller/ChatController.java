@@ -7,6 +7,7 @@ import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
 import com.hhu.campusqa.service.RagService;
+import com.hhu.campusqa.service.SysUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -25,34 +26,64 @@ public class ChatController {
 
     private final QaService qaService;
     private final RagService ragService;
+    private final SysUserService sysUserService;
 
-    public ChatController(QaService qaService, RagService ragService) {
+    public ChatController(QaService qaService, RagService ragService, SysUserService sysUserService) {
         this.qaService = qaService;
         this.ragService = ragService;
+        this.sysUserService = sysUserService;
     }
 
-    /** 提问（RAG 引擎，一次性返回；支持匿名） */
+    /** 提问（RAG 引擎，一次性返回；无 token 或 token 对应的用户已被清理时自动创建访客） */
     @PostMapping("/ask")
     public Result<QaRecord> ask(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        return Result.success(qaService.ask(userId, req.getQuestion(), req.getConversationId()));
+        String guestToken = null;
+
+        try {
+            // 校验 token 对应的用户是否还存在（刷新页面时可能被 beforeunload 清理了）
+            if (userId != null) {
+                try {
+                    if (sysUserService.getById(userId) == null) {
+                        userId = null; // 用户已被删除，重新创建访客
+                    }
+                } catch (Exception ignored) {
+                    userId = null;
+                }
+            }
+
+            // 如果没有有效 userId，自动创建访客
+            if (userId == null) {
+                Map<String, Object> guest = sysUserService.createGuestUser();
+                userId = (Long) guest.get("userId");
+                guestToken = (String) guest.get("token");
+            }
+
+            QaRecord record = qaService.ask(userId, req.getQuestion(), req.getConversationId());
+            if (guestToken != null) {
+                record.setGuestToken(guestToken);
+            }
+            return Result.success(record);
+        } catch (Exception e) {
+            QaRecord fallback = new QaRecord();
+            fallback.setQuestion(req.getQuestion());
+            fallback.setAnswer("知识库暂时不可用，请稍后重试。错误：" + e.getMessage());
+            fallback.setSourceDocs("[]");
+            if (guestToken != null) {
+                fallback.setGuestToken(guestToken);
+            }
+            return Result.success(fallback);
+        }
     }
 
-    /** 流式提问（SSE 打字机效果；支持匿名） */
+    /** 流式提问（SSE 打字机效果） */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamAsk(@Valid @RequestBody ChatRequest req,
                                  HttpServletRequest request) {
         SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
         Long userId = (Long) request.getAttribute("userId");
-        if (userId == null) {
-            // 匿名：只推送答案，不存库
-            ragService.streamAnswer(req.getQuestion(), emitter);
-        } else {
-            // 登录用户：推送答案 + 异步存库
-            ragService.streamAnswer(req.getQuestion(), emitter);
-            // 注：流式场景下异步保存比较复杂，当前保持与原有逻辑一致
-        }
+        ragService.streamAnswer(req.getQuestion(), userId, emitter);
         return emitter;
     }
 

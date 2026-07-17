@@ -184,7 +184,7 @@ export default function LoginPage() {
                   <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }, { pattern: /^[\w-]{3,20}$/, message: '用户名仅支持3-20位字母数字下划线或短横线' }]}>
                     <Input prefix={<UserOutlined />} placeholder="用户名" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]}>
+                  <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
                     <Input.Password prefix={<LockOutlined />} placeholder="密码" />
                   </Form.Item>
                   <Form.Item>
@@ -214,7 +214,7 @@ export default function LoginPage() {
                   <Form.Item name="email" rules={[{ type: 'email', message: '请输入合法邮箱' }]}>
                     <Input prefix={<MailOutlined />} placeholder="邮箱" />
                   </Form.Item>
-                  <Form.Item name="password" rules={[{ required: true, min: 6, message: '密码至少6位' }, { pattern: /(?=.*[A-Za-z])(?=.*\d).{6,}/, message: '密码需包含字母和数字' }]}>
+                  <Form.Item name="password" rules={[{ required: true, min: 6, message: '密码长度需大于6位' }]}>
                     <Input.Password prefix={<LockOutlined />} placeholder="密码" />
                   </Form.Item>
                   <Form.Item name="confirm" dependencies={['password']} rules={[{ required: true, message: '请确认密码' }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('password') === value) return Promise.resolve(); return Promise.reject(new Error('两次输入密码不一致')) } })]}>
