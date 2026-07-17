@@ -142,50 +142,138 @@ export default function HomePage() {
 
   // ==================== 发送消息 ====================
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return
+  /** SSE 流式发送（登录用户使用，打字机效果） */
+  const sendStream = async (text: string) => {
     const q = text.trim()
+    if (!q || loading) return
+    setInput('')
+    setMessages((prev) => [...prev, { role: 'user', content: q }])
+    setLoading(true)
+
+    // 先放一个空的 assistant 占位消息
+    const placeholderIdx = messages.length + 1 // +1 for the user msg just added
+    setMessages((prev) => [...prev, { role: 'assistant', content: '...', feedback: 0 }])
+
+    const token = localStorage.getItem('token')
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ question: q, conversationId: activeConvId ?? undefined }),
+      })
+
+      if (!response.ok) throw new Error('流式请求失败')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('无法读取流')
+
+      const decoder = new TextDecoder()
+      let fullAnswer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        // 按 SSE 协议逐行解析
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            const data = line.substring(5).trim()
+            fullAnswer += data
+            // 逐 token 更新消息
+            setMessages((prev) =>
+              prev.map((m, i) =>
+                i === placeholderIdx ? { ...m, content: fullAnswer } : m
+              )
+            )
+          }
+        }
+      }
+
+      // 流式完成后，用同步接口取 recordId、conversationId 等信息
+      if (isLoggedIn) {
+        try {
+          const res: any = await chatApi.ask(q, activeConvId ?? undefined)
+          if (res.conversationId && !activeConvId) {
+            setActiveConvId(res.conversationId)
+          }
+          // 更新 recordId 以便点赞
+          setMessages((prev) =>
+            prev.map((m, i) =>
+              i === placeholderIdx ? { ...m, recordId: res.id, content: fullAnswer } : m
+            )
+          )
+          loadConversationsFromApi()
+        } catch {
+          // 降级：只更新内容
+          setMessages((prev) =>
+            prev.map((m, i) =>
+              i === placeholderIdx ? { ...m, content: fullAnswer } : m
+            )
+          )
+          loadConversationsFromApi()
+        }
+      }
+    } catch {
+      message.error('流式响应中断，请稍后重试')
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === placeholderIdx ? { ...m, content: m.content === '...' ? '（回答中断，请稍后重试）' : m.content } : m
+        )
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /** 非流式发送（访客使用，兼容模式） */
+  const sendNormal = async (text: string) => {
+    const q = text.trim()
+    if (!q || loading) return
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: q }])
     setLoading(true)
     try {
-      const res: any = await chatApi.ask(q, isLoggedIn ? (activeConvId ?? undefined) : undefined)
+      const res: any = await chatApi.ask(q, undefined)
 
       const assistantMsg: Message = {
         role: 'assistant',
         content: res.answer || '（未获取到回答）',
         sources: safeParseSources(res.sourceDocs),
-        recordId: res.id,   // 用于点赞/踩
+        recordId: res.id,
         feedback: 0,
       }
 
-      if (isLoggedIn) {
-        // ---- 登录用户：后端持久化 ----
-        setMessages((prev) => [...prev, assistantMsg])
-        if (!activeConvId && res.conversationId) {
-          setActiveConvId(res.conversationId)
-        }
-        loadConversationsFromApi()
-      } else {
-        // ---- 访客：本地存储 ----
-        let convId = activeConvId
-        if (convId === null) {
-          // 新会话
-          convId = guestNextId
-          setGuestNextId((n) => n + 1)
-          setActiveConvId(convId)
-        }
-        setGuestConvs((prev) => {
-          const existing = prev[convId!] || []
-          return { ...prev, [convId!]: [...existing, { role: 'user', content: q }, assistantMsg] }
-        })
-        setMessages((prev) => [...prev, assistantMsg])
-        loadConversationsFromLocal()
+      // 访客：本地存储
+      let convId = activeConvId
+      if (convId === null) {
+        convId = guestNextId
+        setGuestNextId((n) => n + 1)
+        setActiveConvId(convId)
       }
+      setGuestConvs((prev) => {
+        const existing = prev[convId!] || []
+        return { ...prev, [convId!]: [...existing, { role: 'user', content: q }, assistantMsg] }
+      })
+      setMessages((prev) => [...prev, assistantMsg])
+      loadConversationsFromLocal()
     } catch {
       message.error('发送失败，请稍后重试')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /** 统一发送入口 */
+  const send = (text: string) => {
+    if (isLoggedIn) {
+      sendStream(text)
+    } else {
+      sendNormal(text)
     }
   }
 

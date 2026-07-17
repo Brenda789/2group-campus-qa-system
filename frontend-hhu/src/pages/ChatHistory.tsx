@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Modal, Tag, message, Descriptions } from 'antd'
+import { Table, Modal, Tag, message, Descriptions, Input, Space } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import { adminApi } from '../api'
 
 /** 安全解析 sources JSON */
@@ -19,11 +20,12 @@ export default function ChatHistory() {
   const [loading, setLoading] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [detail, setDetail] = useState<any>(null)
+  const [keyword, setKeyword] = useState('')
 
   const load = async (p = 1) => {
     setLoading(true)
     try {
-      const res: any = await adminApi.chatHistory(p, 10)
+      const res: any = await adminApi.chatHistory(p, 10, keyword || undefined)
       setData(res.records || [])
       setTotal(res.total || 0)
       setPage(p)
@@ -38,6 +40,11 @@ export default function ChatHistory() {
     load()
   }, [])
 
+  const handleSearch = (value: string) => {
+    setKeyword(value)
+    load(1)
+  }
+
   const openDetail = async (id: number) => {
     try {
       const record: any = await adminApi.chatDetail(id)
@@ -51,10 +58,16 @@ export default function ChatHistory() {
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     {
-      title: '提问用户',
+      title: '用户ID',
       dataIndex: 'userId',
-      width: 100,
+      width: 80,
       render: (uid: number) => <Tag>{uid}</Tag>,
+    },
+    {
+      title: '会话ID',
+      dataIndex: 'conversationId',
+      width: 80,
+      render: (cid: number) => cid ? <Tag color="blue">{cid}</Tag> : <Tag>无</Tag>,
     },
     {
       title: '问题',
@@ -75,6 +88,16 @@ export default function ChatHistory() {
       ),
     },
     {
+      title: '评价',
+      dataIndex: 'feedback',
+      width: 70,
+      render: (f: number) => {
+        if (f === 1) return <Tag color="blue">👍</Tag>
+        if (f === -1) return <Tag color="red">👎</Tag>
+        return <Tag>—</Tag>
+      },
+    },
+    {
       title: '时间',
       dataIndex: 'createTime',
       width: 160,
@@ -91,7 +114,18 @@ export default function ChatHistory() {
 
   return (
     <>
-      <h2 style={{ marginBottom: 24 }}>问答记录</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ margin: 0 }}>问答记录</h2>
+        <Space>
+          <Input.Search
+            placeholder="搜索问题或回答内容"
+            allowClear
+            onSearch={handleSearch}
+            style={{ width: 280 }}
+            prefix={<SearchOutlined />}
+          />
+        </Space>
+      </div>
       <Table
         rowKey="id"
         columns={columns}
@@ -123,6 +157,9 @@ export default function ChatHistory() {
             <Descriptions.Item label="用户ID">{detail.userId}</Descriptions.Item>
             <Descriptions.Item label="会话ID">
               {detail.conversationId ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="评价">
+              {detail.feedback === 1 ? '👍 赞' : detail.feedback === -1 ? '👎 踩' : '未评价'}
             </Descriptions.Item>
             <Descriptions.Item label="时间">
               {detail.createTime?.replace('T', ' ').substring(0, 19)}

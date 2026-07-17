@@ -65,9 +65,9 @@ public class DocumentController {
             throw new BizException(400, "仅支持 PDF / DOCX / TXT / MD 格式，当前类型: ." + ext);
         }
 
-        // 3. 文件大小限制 10MB
-        if (file.getSize() > 10 * 1024 * 1024) {
-            throw new BizException(400, "文件大小不能超过 10MB");
+        // 3. 文件大小限制 50MB
+        if (file.getSize() > 50L * 1024 * 1024) {
+            throw new BizException(400, "文件大小不能超过 50MB");
         }
 
         try {

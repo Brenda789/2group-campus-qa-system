@@ -391,8 +391,13 @@ public class RagService {
 
     // ==================== LLM 调用 ====================
 
+    /** LLM 调用最大重试次数 */
+    private static final int LLM_MAX_RETRIES = 3;
+    /** 重试等待间隔（毫秒） */
+    private static final long LLM_RETRY_DELAY_MS = 800;
+
     /**
-     * 同步调用 LLM
+     * 同步调用 LLM（支持重试）
      */
     @SuppressWarnings("unchecked")
     private String callLlmSync(String userMessage) {
@@ -406,29 +411,65 @@ public class RagService {
                 "stream", false
         );
 
-        try {
-            Map<String, Object> response = llmClient.post()
-                    .uri(DASHSCOPE_LLM_URL)
-                    .bodyValue(body)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+        return callLlmWithRetry(body, userMessage);
+    }
 
-            if (response == null) return "LLM 服务返回为空，请稍后重试。";
+    /** 带重试的 LLM 请求 */
+    @SuppressWarnings("unchecked")
+    private String callLlmWithRetry(Map<String, Object> body, String userMessage) {
+        Exception lastException = null;
 
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-            if (choices == null || choices.isEmpty()) return "LLM 服务返回异常，请稍后重试。";
+        for (int attempt = 1; attempt <= LLM_MAX_RETRIES; attempt++) {
+            try {
+                Map<String, Object> response = llmClient.post()
+                        .uri(DASHSCOPE_LLM_URL)
+                        .bodyValue(body)
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .block();
 
-            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-            if (message == null) return "LLM 消息为空，请稍后重试。";
+                if (response == null) {
+                    log.warn("LLM 返回为空，尝试 {}/{}", attempt, LLM_MAX_RETRIES);
+                    continue;
+                }
 
-            String content = (String) message.get("content");
-            return content != null ? content.trim() : "LLM 未生成回答，请稍后重试。";
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                if (choices == null || choices.isEmpty()) {
+                    log.warn("LLM choices 为空，尝试 {}/{}", attempt, LLM_MAX_RETRIES);
+                    continue;
+                }
 
-        } catch (Exception e) {
-            log.error("LLM 同步调用失败: {}", e.toString());
-            return "AI 服务暂时不可用，请稍后重试。";
+                Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                if (message == null) {
+                    log.warn("LLM message 为空，尝试 {}/{}", attempt, LLM_MAX_RETRIES);
+                    continue;
+                }
+
+                String content = (String) message.get("content");
+                if (content != null && !content.trim().isEmpty()) {
+                    return content.trim();
+                }
+                log.warn("LLM content 为空，尝试 {}/{}", attempt, LLM_MAX_RETRIES);
+
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("LLM 调用失败，尝试 {}/{}: {}", attempt, LLM_MAX_RETRIES, e.toString());
+            }
+
+            // 非最后一次尝试则等待后重试
+            if (attempt < LLM_MAX_RETRIES) {
+                try {
+                    Thread.sleep(LLM_RETRY_DELAY_MS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
         }
+
+        log.error("LLM 调用最终失败（已重试 {} 次），最后错误: {}",
+                LLM_MAX_RETRIES, lastException != null ? lastException.toString() : "返回内容为空");
+        return "AI 服务暂时不可用，请稍后重试。";
     }
 
     /**

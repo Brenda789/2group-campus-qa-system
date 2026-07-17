@@ -3,6 +3,7 @@ package com.hhu.campusqa.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.common.Result;
+import com.hhu.campusqa.entity.Conversation;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.KbDocumentService;
 import com.hhu.campusqa.service.QaService;
@@ -61,13 +62,14 @@ public class AdminController {
         return Result.success(data);
     }
 
-    /** 全量问答记录（分页） */
+    /** 全量问答记录（分页，支持关键词搜索） */
     @GetMapping("/chat/history")
     public Result<Page<QaRecord>> chatHistory(@RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "10") int size,
+                                              @RequestParam(required = false) String keyword,
                                               HttpServletRequest request) {
         checkAdmin(request);
-        return Result.success(qaService.pageAllQaRecords(page, size));
+        return Result.success(qaService.pageAllQaRecords(page, size, keyword));
     }
 
     /** 单条问答详情 */
@@ -91,6 +93,15 @@ public class AdminController {
                 "message", "索引重建完成",
                 "chunkCount", ragService.getVectorStoreSize()
         ));
+    }
+
+    /** 全量会话列表（分页） */
+    @GetMapping("/conversations")
+    public Result<Page<Conversation>> conversations(@RequestParam(defaultValue = "1") int page,
+                                                    @RequestParam(defaultValue = "10") int size,
+                                                    HttpServletRequest request) {
+        checkAdmin(request);
+        return Result.success(qaService.pageAllConversations(page, size));
     }
 
     private void checkAdmin(HttpServletRequest request) {

@@ -157,9 +157,9 @@ export const adminApi = {
     return { userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0 }
   }),
 
-  /** 全量问答记录分页 → Page<QaRecord> */
-  chatHistory: (page = 1, size = 10) =>
-    request.get('/admin/chat/history', { params: { page, size } }).catch(() => {
+  /** 全量问答记录分页 → Page<QaRecord>，支持关键词搜索 */
+  chatHistory: (page = 1, size = 10, keyword?: string) =>
+    request.get('/admin/chat/history', { params: { page, size, keyword } }).catch(() => {
       console.warn(`${MOCK_PREFIX} admin chatHistory fallback`)
       return { records: [], total: 0 }
     }),
@@ -167,6 +167,13 @@ export const adminApi = {
     request.get(`/admin/chat/${id}`).catch(() => {
       console.warn(`${MOCK_PREFIX} admin chatDetail fallback id=${id}`)
       throw new Error('后端未连接，无法查看详情')
+    }),
+
+  /** 全量会话列表分页 */
+  conversations: (page = 1, size = 10) =>
+    request.get('/admin/conversations', { params: { page, size } }).catch(() => {
+      console.warn(`${MOCK_PREFIX} admin conversations fallback`)
+      return { records: [], total: 0 }
     }),
 
   /** 重建向量索引

@@ -73,12 +73,17 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
     }
 
     /** 管理端：分页查询所有用户问答记录 */
-    public Page<QaRecord> pageAllQaRecords(int page, int size) {
-        return this.page(
-                new Page<>(page, size),
-                new LambdaQueryWrapper<QaRecord>()
-                        .orderByDesc(QaRecord::getCreateTime)
-        );
+    public Page<QaRecord> pageAllQaRecords(int page, int size, String keyword) {
+        LambdaQueryWrapper<QaRecord> qw = new LambdaQueryWrapper<>();
+        if (org.springframework.util.StringUtils.hasText(keyword)) {
+            qw.and(w -> w
+                .like(QaRecord::getQuestion, keyword)
+                .or()
+                .like(QaRecord::getAnswer, keyword)
+            );
+        }
+        qw.orderByDesc(QaRecord::getCreateTime);
+        return this.page(new Page<>(page, size), qw);
     }
 
     /**
@@ -157,6 +162,15 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         return conversationMapper.selectList(
                 new LambdaQueryWrapper<Conversation>()
                         .eq(Conversation::getUserId, userId)
+                        .orderByDesc(Conversation::getUpdateTime)
+        );
+    }
+
+    /** 全量会话分页（管理员） */
+    public Page<Conversation> pageAllConversations(int page, int size) {
+        return (Page<Conversation>) conversationMapper.selectPage(
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size),
+                new LambdaQueryWrapper<Conversation>()
                         .orderByDesc(Conversation::getUpdateTime)
         );
     }
