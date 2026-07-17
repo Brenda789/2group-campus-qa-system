@@ -8,7 +8,7 @@ import axios from 'axios'
  * - 响应拦截：提取 data 层，统一处理 code !== 200 和 401
  */
 const request = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: '/api',
   timeout: 10000,
 })
 
@@ -24,13 +24,13 @@ request.interceptors.request.use((cfg) => {
 // ==================== 响应拦截：统一错误处理 ====================
 request.interceptors.response.use(
   (res) => {
-    const { code, message, data } = res.data
-    if (code !== 200) {
+    const body = res.data as { code: number; message?: string; data?: unknown }
+    if (body.code !== 200) {
       // 业务异常 → 抛出 message 给调用方 catch
-      return Promise.reject(new Error(message || '请求失败'))
+      return Promise.reject(new Error(body.message || '请求失败'))
     }
     // 直接返回 data，调用方无需写 .data
-    return data
+    return body.data
   },
   (err) => {
     if (err.response?.status === 401) {

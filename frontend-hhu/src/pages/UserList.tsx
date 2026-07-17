@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Table, Tag, Button, Input, Space, message, Popconfirm, Card, Typography, Modal, Form, Select, Switch } from 'antd'
-import { UserOutlined, CheckCircleOutlined, StopOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
+import { ReloadOutlined, UserOutlined, CheckCircleOutlined, StopOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
 import { userApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import { useNotifications } from '../contexts/NotificationContext'
 
 const { Title, Text } = Typography
 
 export default function UserList() {
-  const { role } = useAuth()
+  const { role, user } = useAuth()
   const isAdmin = role === 'admin'
+  const { push } = useNotifications()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -44,9 +46,11 @@ export default function UserList() {
     try {
       await userApi.toggleStatus(userId, newStatus)
       message.success(newStatus === 1 ? '已启用该用户' : '已禁用该用户')
+      push({ type: 'success', category: 'user', message: newStatus === 1 ? `已启用用户 ID:${userId}` : `已禁用用户 ID:${userId}` })
       load(page, keyword)
     } catch {
       message.error('操作失败')
+      push({ type: 'error', category: 'user', message: `启停用户 ID:${userId} 失败` })
     }
   }
 
@@ -54,9 +58,11 @@ export default function UserList() {
     try {
       await userApi.remove(userId)
       message.success('删除成功')
+      push({ type: 'success', category: 'user', message: `已删除用户 ID:${userId}` })
       load(page, keyword)
     } catch {
       message.error('删除失败')
+      push({ type: 'error', category: 'user', message: `删除用户 ID:${userId} 失败` })
     }
   }
 
@@ -71,8 +77,10 @@ export default function UserList() {
     setEditingUser(record)
     form.setFieldsValue({
       username: record.username,
-      email: record.email,
+      email: record.email || '',
       role: record.role,
+      newPassword: '',
+      confirmPassword: '',
     })
     setModalOpen(true)
   }
@@ -82,17 +90,42 @@ export default function UserList() {
       const values = await form.validateFields()
       setSubmitting(true)
       if (editingUser) {
-        await userApi.update(editingUser.id, { email: values.email, role: values.role })
+        // 编辑模式：更新用户名、邮箱、角色
+        await userApi.update(editingUser.id, {
+          username: values.username,
+          email: values.email,
+          role: values.role,
+        })
+        // 构建变更详情
+        const changes: string[] = []
+        if (values.username !== editingUser.username) {
+          changes.push(`用户名: ${editingUser.username} → ${values.username}`)
+        }
+        if (values.email !== (editingUser.email || '')) {
+          changes.push(`邮箱: ${editingUser.email || '无'} → ${values.email || '无'}`)
+        }
+        if (values.role !== editingUser.role) {
+          changes.push(`角色: ${editingUser.role === 'admin' ? '管理员' : '普通用户'} → ${values.role === 'admin' ? '管理员' : '普通用户'}`)
+        }
+        // 如果填了新密码，则重置密码
+        if (values.newPassword) {
+          await userApi.resetPassword(editingUser.id, values.newPassword)
+          changes.push('已重置密码')
+        }
+        const changeDetail = changes.length ? `（${changes.join('，')}）` : ''
         message.success('编辑成功')
+        push({ type: 'success', category: 'user', message: `已编辑用户「${values.username}」${changeDetail}` })
       } else {
         await userApi.create(values.username, values.password, values.email || '', values.role || 'user')
         message.success('新增成功')
+        push({ type: 'success', category: 'user', message: `已新增用户「${values.username}」` })
       }
       setModalOpen(false)
       load(page, keyword)
     } catch (e: any) {
       if (e?.errorFields) return // form validation error
       message.error(e?.message || '操作失败')
+      push({ type: 'error', category: 'user', message: editingUser ? `编辑用户失败` : `新增用户失败` })
     } finally {
       setSubmitting(false)
     }
@@ -132,8 +165,18 @@ export default function UserList() {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (status: number, record: any) =>
-        isAdmin ? (
+      render: (status: number, record: any) => {
+        const isSelf = record.username === user.username
+        // 不能禁用自己
+        if (isSelf) {
+          return (
+            <Tag icon={<CheckCircleOutlined />} color="success">
+              启用中
+            </Tag>
+          )
+        }
+        // 其他用户：管理员可切换，普通用户只看
+        return isAdmin ? (
           <Popconfirm
             title={status === 1 ? '确定禁用该用户？' : '确定启用该用户？'}
             onConfirm={() => handleToggle(record.id, status === 1 ? 0 : 1)}
@@ -150,7 +193,8 @@ export default function UserList() {
           <Tag icon={status === 1 ? <CheckCircleOutlined /> : <StopOutlined />} color={status === 1 ? 'success' : 'error'}>
             {status === 1 ? '启用' : '禁用'}
           </Tag>
-        ),
+        )
+      },
     },
     {
       title: '创建时间',
@@ -206,7 +250,7 @@ export default function UserList() {
               enterButton
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate} size="large">新增用户</Button>
-            <Button onClick={() => load(page, keyword)}>刷新</Button>
+            <Button icon={<ReloadOutlined spin={loading} />} onClick={() => load(page, keyword)} loading={loading} disabled={loading}>刷新</Button>
             <Button onClick={handleExportCSV}>导出 CSV</Button>
           </div>
         </div>
@@ -236,13 +280,47 @@ export default function UserList() {
           cancelText="取消"
         >
           <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-            <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }, { pattern: /^[\w-]{3,20}$/, message: '3-20位字母数字下划线或短横线' }]}>
-              <Input disabled={!!editingUser} placeholder="请输入用户名" />
+            <Form.Item
+              name="username"
+              label="用户名"
+              rules={[{ required: true, message: '请输入用户名' }, { pattern: /^[\w\u4e00-\u9fa5-]{2,20}$/, message: '2-20位字母、数字、下划线或中文' }]}
+            >
+              <Input placeholder="请输入用户名" />
             </Form.Item>
             <Form.Item name="email" label="邮箱" rules={[{ type: 'email', message: '请输入合法邮箱' }]}>
               <Input placeholder="请输入邮箱" />
             </Form.Item>
-            {!editingUser && (
+            {editingUser ? (
+              <>
+                <Form.Item
+                  name="newPassword"
+                  label="新密码（留空则不修改）"
+                  rules={[
+                    { min: 6, message: '密码至少6位' },
+                  ]}
+                >
+                  <Input.Password placeholder="请输入新密码" />
+                </Form.Item>
+                <Form.Item
+                  name="confirmPassword"
+                  label="确认新密码"
+                  dependencies={['newPassword']}
+                  rules={[
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        const newPwd = getFieldValue('newPassword')
+                        if (!newPwd) return Promise.resolve()
+                        if (!value) return Promise.reject(new Error('请再次输入新密码'))
+                        if (newPwd !== value) return Promise.reject(new Error('两次输入的密码不一致'))
+                        return Promise.resolve()
+                      },
+                    }),
+                  ]}
+                >
+                  <Input.Password placeholder="请再次输入新密码" />
+                </Form.Item>
+              </>
+            ) : (
               <Form.Item name="password" label="密码" rules={[{ required: true, min: 6, message: '密码至少6位' }]}>
                 <Input.Password placeholder="请输入密码" />
               </Form.Item>

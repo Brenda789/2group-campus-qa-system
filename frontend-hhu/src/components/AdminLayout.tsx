@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { userApi } from '../api'
+import FloatingNotifyBell from './FloatingNotifyBell'
 
 const { Sider, Header, Content } = Layout
 
@@ -50,12 +51,16 @@ export default function AdminLayout() {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users'
     if (location.pathname.startsWith('/admin/documents')) return '/admin/documents'
     if (location.pathname.startsWith('/admin/chat')) return '/admin/chat'
+    if (location.pathname.startsWith('/admin/profile')) return '/admin/profile'
     return '/admin'
   }
 
   const menuItems = [
     { key: '/admin', icon: <DashboardOutlined />, label: '仪表盘' },
     { key: '/admin/chat', icon: <CommentOutlined />, label: '问答记录' },
+    ...(role !== 'admin'
+      ? [{ key: '/admin/profile', icon: <UserOutlined />, label: '个人管理' }]
+      : []),
     ...(role === 'admin'
       ? [
           { key: '/admin/users', icon: <UserOutlined />, label: '用户管理' },
@@ -110,6 +115,14 @@ export default function AdminLayout() {
   }
 
   const userMenuItems = [
+    ...(role !== 'admin'
+      ? [{
+          key: 'profile',
+          icon: <UserOutlined />,
+          label: '个人管理',
+          onClick: () => navigate('/admin/profile'),
+        }]
+      : []),
     {
       key: 'email',
       icon: <MailOutlined />,
@@ -354,6 +367,7 @@ export default function AdminLayout() {
           </Form.Item>
         </Form>
       </Modal>
+      <FloatingNotifyBell />
     </Layout>
   )
 }

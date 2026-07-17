@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography } from 'antd'
 import { UploadOutlined, ReloadOutlined, SearchOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { docApi, adminApi } from '../api'
+import { useNotifications } from '../contexts/NotificationContext'
 
 const { Title, Text } = Typography
 
@@ -34,6 +35,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function DocumentManage() {
+  const { push } = useNotifications()
   const [data, setData] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -74,12 +76,15 @@ export default function DocumentManage() {
   const handleUpload = async (info: any) => {
     const file = info.file as File
     setUploading(true)
+    push({ type: 'processing', category: 'document', message: `「${file.name}」文档上传中` })
     try {
       await docApi.upload(file)
       message.success('上传成功，正在处理')
+      push({ type: 'success', category: 'document', message: `「${file.name}」文档上传成功` })
       load(1)
     } catch {
       message.error('上传失败')
+      push({ type: 'error', category: 'document', message: `「${file.name}」文档上传失败` })
     } finally {
       setUploading(false)
     }
@@ -89,9 +94,11 @@ export default function DocumentManage() {
     try {
       await docApi.remove(id)
       message.success('已删除')
+      push({ type: 'success', category: 'document', message: `已删除文档 ID:${id}` })
       load(page)
     } catch {
       message.error('删除失败')
+      push({ type: 'error', category: 'document', message: `删除文档 ID:${id} 失败` })
     }
   }
 
@@ -99,9 +106,11 @@ export default function DocumentManage() {
     try {
       await docApi.reprocess(id)
       message.success('已触发重新处理')
+      push({ type: 'info', category: 'document', message: `已触发文档 ID:${id} 重新处理` })
       load(page)
     } catch {
       message.error('重新处理失败')
+      push({ type: 'error', category: 'document', message: `重新处理文档 ID:${id} 失败` })
     }
   }
 
@@ -110,9 +119,11 @@ export default function DocumentManage() {
     try {
       await adminApi.rebuildIndex()
       message.success('索引重建完成')
+      push({ type: 'success', category: 'system', message: '知识库索引重建完成' })
       load(page)
     } catch {
       message.error('索引重建失败')
+      push({ type: 'error', category: 'system', message: '索引重建失败' })
     } finally {
       setRebuilding(false)
     }

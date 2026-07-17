@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Input, Card, message, Space, Tag, Row, Col, Typography, Spin, Modal, Upload } from 'antd'
+import { Button, Input, Card, message, Space, Tag, Spin, Modal, Upload } from 'antd'
 import {
   RobotOutlined,
   SendOutlined,
@@ -11,16 +11,14 @@ import {
   UploadOutlined,
   BookOutlined,
   EnvironmentOutlined,
-  TeamOutlined,
   TrophyOutlined,
   SafetyOutlined,
   LikeOutlined,
   DislikeOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { chatApi, docApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
-
-const { Title, Text, Paragraph } = Typography
 
 interface Message {
   role: 'user' | 'assistant'
@@ -43,14 +41,6 @@ const QUICK_QUESTIONS = [
   '奖学金怎么申请？',
 ]
 
-/** 首页特色卡片数据 */
-const features = [
-  { icon: <BookOutlined />, title: '百年学府', desc: '始于1915年，中国水利高等教育发源地', color: '#005BAC', bg: '#edf6ff' },
-  { icon: <TrophyOutlined />, title: '双一流学科', desc: '水利工程、环境科学与工程入选', color: '#059669', bg: '#ecfdf5' },
-  { icon: <TeamOutlined />, title: '5万+师生', desc: '覆盖工学、理学、管理学等多学科', color: '#7c3aed', bg: '#f5f3ff' },
-  { icon: <EnvironmentOutlined />, title: '三区办学', desc: '南京·常州，一校多区', color: '#d97706', bg: '#fffbeb' },
-]
-
 /** 前台门户首页 + 浮动问答机器人
  *
  *  支持两种模式：
@@ -59,7 +49,7 @@ const features = [
  */
 export default function HomePage() {
   const navigate = useNavigate()
-  const { isLoggedIn, user, logout } = useAuth()
+  const { isLoggedIn, user, role, logout } = useAuth()
   const [chatOpen, setChatOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -109,11 +99,6 @@ export default function HomePage() {
       return { id: Number(id), title }
     })
     setConversations(list)
-  }
-
-  const loadConversations = () => {
-    if (isLoggedIn) loadConversationsFromApi()
-    else loadConversationsFromLocal()
   }
 
   // ==================== 消息加载 ====================
@@ -351,222 +336,384 @@ export default function HomePage() {
     }
   }
 
+  // ==================== 背景轮播 & 左侧卡片轮播 ====================
+  const bgImages = [
+    '/images/campus/jintan.png',
+    '/images/campus/jintan.png',
+    '/images/campus/jintan.png',
+  ]
+  const [bgIndex, setBgIndex] = useState(0)
+  const bgTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const [cardIndex, setCardIndex] = useState(0)
+
+  const resetBgTimer = useCallback(() => {
+    clearInterval(bgTimerRef.current)
+    bgTimerRef.current = setInterval(() => setBgIndex(prev => (prev + 1) % bgImages.length), 5000)
+  }, [bgImages.length])
+
+  useEffect(() => {
+    resetBgTimer()
+    return () => clearInterval(bgTimerRef.current)
+  }, [resetBgTimer])
+
+  const goToBg = (i: number) => { setBgIndex(i); resetBgTimer() }
+
+  const schoolCards = [
+    { title: '百年学府', desc: '河海大学始于1915年，是中国水利高等教育的发源地，百年风雨兼程，培养了无数水利英才。', icon: <BookOutlined /> },
+    { title: '双一流学科', desc: '水利工程、环境科学与工程入选国家"双一流"建设学科，工程学进入ESI全球排名前1‰。', icon: <TrophyOutlined /> },
+    { title: '三区办学', desc: '学校在南京、常州两地办学，拥有西康路、江宁、金坛三个校区，总占地面积超4000亩。', icon: <EnvironmentOutlined /> },
+    { title: '科研实力', desc: '设有国家级科研平台12个，省部级重点实验室40余个，承担多项国家重大科技项目。', icon: <SafetyOutlined /> },
+  ]
+
+  const prevCard = () => setCardIndex(prev => (prev - 1 + schoolCards.length) % schoolCards.length)
+  const nextCard = () => setCardIndex(prev => (prev + 1) % schoolCards.length)
+
   // ==================== 渲染 ====================
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--hhu-bg, #f0f4f9)' }}>
-      {/* 顶部导航 */}
+    <div
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+      }}
+    >
+      {/* ===== 轮播背景 ===== */}
+      {bgImages.map((img, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundImage: `url(${img})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'brightness(0.45) saturate(0.8)',
+            opacity: i === bgIndex ? 1 : 0,
+            transition: 'opacity 1.5s ease',
+            zIndex: 0,
+          }}
+        />
+      ))}
+
+      {/* ===== 底部背景圆点指示器 ===== */}
+      <div
+        style={{
+          position: 'fixed',
+          left: '5%',
+          bottom: '6%',
+          zIndex: 2,
+          display: 'flex',
+          gap: 10,
+        }}
+      >
+        {bgImages.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => goToBg(i)}
+            style={{
+              width: i === bgIndex ? 24 : 8,
+              height: 8,
+              borderRadius: 4,
+              border: 'none',
+              background: i === bgIndex ? '#fff' : 'rgba(255,255,255,0.35)',
+              transition: 'all 0.4s cubic-bezier(0.22,0.05,0.19,1)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* ===== 顶部导航栏 — 渐变变深 → 透明 ===== */}
       <header
         style={{
-          background: 'linear-gradient(135deg, #0a2540 0%, #0d3b66 50%, #0f4478 100%)',
-          color: '#fff',
-          padding: '0 40px',
-          height: 64,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 2px 16px rgba(0,0,0,0.15)',
           position: 'sticky',
           top: 0,
           zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: 64,
+          padding: '0 32px',
+          background: 'linear-gradient(180deg, rgba(6,11,20,0.70) 0%, rgba(6,11,20,0.25) 50%, transparent 100%)',
+          backdropFilter: 'blur(28px) saturate(120%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(120%)',
+          maskImage: 'linear-gradient(180deg, #000 0%, #000 50%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, #000 0%, #000 50%, transparent 100%)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            width: 38, height: 38, borderRadius: 10,
-            background: 'linear-gradient(135deg, #0ea5e9, #005BAC)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800,
-            boxShadow: '0 4px 12px rgba(14,165,233,0.35)',
-          }}>河</span>
-          <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>河海大学</span>
+        {/* 左侧：Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 180 }}>
+          <img
+            src="/images/logo.svg"
+            alt="河海大学"
+            style={{ height: 36, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}
+          />
         </div>
-        <Space>
-          {/* 上传文档按钮：所有人可见 */}
-          <Button
-            ghost
-            onClick={() => setUploadOpen(true)}
-            icon={<UploadOutlined />}
-            style={{
-              borderRadius: 8, fontWeight: 600, fontSize: 14,
-              borderColor: '#7dd3fc', color: '#7dd3fc',
-            }}
-          >
+
+        {/* 中间：功能按钮 — 纯文字 + 悬停圆形展开 */}
+        <div style={{ display: 'flex', gap: 32, justifyContent: 'center', flex: 1 }}>
+          <button className="nav-text-btn" onClick={() => setUploadOpen(true)}>
+            <UploadOutlined style={{ fontSize: 15 }} />
             上传文档
-          </Button>
+          </button>
+          {role !== 'admin' && (
+            <button className="nav-text-btn" onClick={() => navigate('/admin/profile')}>
+              <UserOutlined style={{ fontSize: 15 }} />
+              个人管理
+            </button>
+          )}
+          <button className="nav-text-btn" onClick={() => navigate('/admin')}>
+            <SafetyOutlined style={{ fontSize: 15 }} />
+            管理后台
+          </button>
+        </div>
+
+        {/* 右侧：登录/注册 或 退出 */}
+        <div style={{ display: 'flex', gap: 10, minWidth: 180, justifyContent: 'flex-end' }}>
           {isLoggedIn ? (
             <>
-              <span style={{ color: '#a5d8ff', fontSize: 14, fontWeight: 500 }}>
+              <span style={{ color: 'rgba(255,255,255,0.80)', fontSize: 14, fontWeight: 500, lineHeight: '38px' }}>
                 👋 {user.username}
               </span>
               <Button
-                type="primary"
-                ghost
-                onClick={() => navigate('/admin')}
-                icon={<SafetyOutlined />}
+                onClick={() => { logout(); navigate('/'); }}
                 style={{
-                  borderRadius: 8, fontWeight: 600, fontSize: 14,
-                  borderColor: '#7dd3fc', color: '#7dd3fc',
+                  borderRadius: 12,
+                  fontWeight: 500,
+                  fontSize: 14,
+                  height: 38,
+                  background: 'rgba(255,255,255,0.10)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'rgba(255,255,255,0.70)',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255,80,80,0.20)'
+                  e.currentTarget.style.color = '#ffcccc'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.70)'
                 }}
               >
-                管理后台
-              </Button>
-              <Button
-                type="text"
-                onClick={() => { logout(); navigate('/'); }}
-                style={{ color: '#94a3b8', fontWeight: 500 }}
-              >
-                退出
+                退出登录 Logout
               </Button>
             </>
           ) : (
             <>
-              <Button
-                type="primary"
-                ghost
+              <button className="nav-text-btn" onClick={() => navigate('/login')}>
+                登录 Sign In
+              </button>
+              <button
+                className="nav-text-btn"
                 onClick={() => navigate('/login')}
-                style={{
-                  borderRadius: 8, fontWeight: 600, fontSize: 14,
-                  borderColor: '#7dd3fc', color: '#7dd3fc',
-                }}
+                style={{ color: '#c4e1dd' }}
               >
-                登录
-              </Button>
-              <Button
-                type="primary"
-                ghost
-                onClick={() => navigate('/login')}
-                icon={<SafetyOutlined />}
-                style={{
-                  borderRadius: 8, fontWeight: 600, fontSize: 14,
-                  borderColor: '#7dd3fc', color: '#7dd3fc',
-                }}
-              >
-                管理后台
-              </Button>
+                注册 Sign Up
+              </button>
             </>
           )}
-        </Space>
+        </div>
       </header>
 
-      {/* Hero 区域 */}
-      <section
+      {/* ===== 主体区域 ===== */}
+      <main
         style={{
           position: 'relative',
-          background: `url('/images/campus/jintan.png') center/cover no-repeat`,
-          padding: '80px 40px 100px',
-          textAlign: 'center',
+          zIndex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 64px)',
+          padding: '0 5%',
+          gap: '5%',
         }}
       >
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(10,37,64,0.85) 0%, rgba(13,59,102,0.75) 60%, rgba(240,244,249,1) 100%)',
-        }} />
-        <img
-          src="/images/logo.svg"
-          alt="河海大学校徽"
+        {/* ===== 左侧：环形卡片轮播 ===== */}
+        <div
           style={{
-            width: 200, display: 'block', margin: '0 auto 24px',
-            filter: 'drop-shadow(0 8px 24px rgba(14,165,233,0.40))',
+            position: 'relative',
+            width: 300,
+            height: 360,
+            flexShrink: 0,
           }}
-        />
-        <Title level={2} style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 16, fontWeight: 400, fontSize: 20 }}>
-          艰苦朴素 · 实事求是 · 严格要求 · 勇于探索
-        </Title>
-        <Paragraph style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, maxWidth: 600, margin: '0 auto' }}>
-          一所以水利为特色、工科为主、多学科协调发展的教育部直属全国重点大学
-        </Paragraph>
-      </section>
-
-      {/* 特色卡片 */}
-      <section style={{ padding: '0 40px 40px', marginTop: -40 }}>
-        <Row gutter={[20, 20]}>
-          {features.map((f) => (
-            <Col xs={24} sm={12} md={6} key={f.title}>
-              <Card
-                style={{
-                  borderRadius: 16,
-                  border: '1px solid #eef2f7',
-                  textAlign: 'center',
-                  cursor: 'default',
-                }}
-                styles={{ body: { padding: '28px 20px 24px' } }}
-              >
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: f.bg, color: f.color, fontSize: 26,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 16px',
-                }}>
-                  {f.icon}
-                </div>
-                <Title level={5} style={{ marginBottom: 6, fontWeight: 700 }}>{f.title}</Title>
-                <Text type="secondary" style={{ fontSize: 13 }}>{f.desc}</Text>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </section>
-
-      {/* 底部信息 */}
-      <section style={{ padding: '0 40px 60px' }}>
-        <Card
-          style={{ borderRadius: 16, border: '1px solid #eef2f7' }}
-          styles={{ body: { padding: '32px 40px' } }}
         >
-          <Row gutter={[40, 20]} align="middle">
-            <Col xs={24} md={16}>
-              <Title level={4} style={{ marginBottom: 8, fontWeight: 700 }}>
-                💬 智能问答助手
-              </Title>
-              <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 14 }}>
-                基于大语言模型的校园智能问答系统，覆盖校内办事指南、教务政策、生活服务等高频问题。
-                点击右下角机器人图标开始提问。
-                {!isLoggedIn && ' 登录后可永久保存问答记录。'}
-              </Paragraph>
-              <Space wrap>
-                {QUICK_QUESTIONS.map((q) => (
-                  <Tag
-                    key={q}
-                    style={{
-                      cursor: 'pointer', borderRadius: 20, padding: '4px 14px',
-                      fontSize: 13, border: '1px solid #dbeafe', background: '#eff6ff', color: '#005BAC',
-                    }}
-                    onClick={() => { setChatOpen(true); setTimeout(() => send(q), 300) }}
-                  >
-                    {q}
-                  </Tag>
-                ))}
-              </Space>
-            </Col>
-            <Col xs={24} md={8} style={{ textAlign: 'center' }}>
-              <Button
-                type="primary"
-                size="large"
-                icon={<RobotOutlined />}
-                onClick={() => setChatOpen(true)}
+          {/* 卡片堆叠效果 */}
+          {schoolCards.map((card, i) => {
+            const offset = i - cardIndex
+            const isActive = offset === 0
+            const absOffset = Math.abs(offset)
+            return (
+              <div
+                key={i}
+                className="glass-card"
+                onClick={() => {
+                  if (offset === -1) prevCard()
+                  if (offset === 1) nextCard()
+                }}
                 style={{
-                  borderRadius: 30, height: 52, padding: '0 32px', fontSize: 16, fontWeight: 600,
-                  background: 'linear-gradient(135deg, #005BAC, #0ea5e9)',
-                  border: 'none', boxShadow: '0 6px 24px rgba(0,91,172,0.35)',
+                  position: 'absolute',
+                  inset: 0,
+                  padding: '28px 24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  transform: `translateY(${offset * 16}px) scale(${1 - absOffset * 0.06})`,
+                  opacity: 1 - absOffset * 0.45,
+                  zIndex: isActive ? 3 : 2 - absOffset,
+                  cursor: absOffset === 1 ? 'pointer' : 'default',
+                  pointerEvents: absOffset <= 1 ? 'auto' : 'none',
+                  transition: 'all 0.5s cubic-bezier(0.22,0.05,0.19,1)',
                 }}
               >
-                开始提问
-              </Button>
-            </Col>
-          </Row>
-        </Card>
-      </section>
+                <div
+                  style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: 'rgba(196,225,221,0.18)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 22, color: '#c4e1dd', marginBottom: 16,
+                  }}
+                >
+                  {card.icon}
+                </div>
+                <h3 style={{ color: 'rgba(255,255,255,0.92)', fontSize: 19, fontWeight: 600, margin: '0 0 10px', letterSpacing: '-0.3px' }}>
+                  {card.title}
+                </h3>
+                <p style={{ color: 'rgba(255,255,255,0.50)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+                  {card.desc}
+                </p>
+              </div>
+            )
+          })}
 
-      {/* 页脚 */}
-      <footer style={{
-        textAlign: 'center', padding: '28px 40px',
-        borderTop: '1px solid #eef2f7',
-        color: '#9ca3af', fontSize: 13,
-      }}>
+          {/* 上下箭头 */}
+          <button
+            onClick={prevCard}
+            style={{
+              position: 'absolute', top: -20, left: '50%', transform: 'translateX(-50%)',
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.22)',
+              color: 'rgba(255,255,255,0.75)', fontSize: 16, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 5, transition: 'all 0.3s ease',
+            }}
+          >▲</button>
+          <button
+            onClick={nextCard}
+            style={{
+              position: 'absolute', bottom: -20, left: '50%', transform: 'translateX(-50%)',
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.22)',
+              color: 'rgba(255,255,255,0.75)', fontSize: 16, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 5, transition: 'all 0.3s ease',
+            }}
+          >▼</button>
+        </div>
+
+        {/* ===== 中部：智能问答搜索框 ===== */}
+        <div
+          style={{
+            flex: 1,
+            maxWidth: 620,
+            textAlign: 'center',
+          }}
+        >
+          <h1
+            style={{
+              color: '#fff',
+              fontSize: 36,
+              fontWeight: 700,
+              textShadow: '0 2px 20px rgba(255,255,255,0.20), 0 6px 40px rgba(0,0,0,0.5)',
+              margin: '0 0 8px',
+              letterSpacing: '-0.5px',
+            }}
+          >
+            河海大学智能问答助手
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.50)', fontSize: 15, margin: '0 0 36px' }}>
+            基于大语言模型的校园智能问答系统，随时为您解答
+          </p>
+
+          {/* 搜索框 — 液态玻璃 */}
+          <div
+            className="liquid-search"
+            style={{ boxShadow: '0 8px 40px rgba(20,50,132,0.30)' }}
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && input.trim()) {
+                  setChatOpen(true)
+                  setTimeout(() => send(input), 200)
+                }
+              }}
+              placeholder="输入你想提问的内容..."
+              className="liquid-search-input"
+            />
+            <button
+              onClick={() => { if (input.trim()) { setChatOpen(true); setTimeout(() => send(input), 200) } }}
+              className="liquid-search-btn"
+              title="发送"
+            >
+              <SendOutlined style={{ fontSize: 20 }} />
+            </button>
+          </div>
+
+          {/* 快捷问题标签 */}
+          <div style={{ marginTop: 24, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {QUICK_QUESTIONS.map((q) => (
+              <span
+                key={q}
+                onClick={() => { setChatOpen(true); setTimeout(() => send(q), 300) }}
+                style={{
+                  cursor: 'pointer',
+                  padding: '6px 16px',
+                  borderRadius: 20,
+                  fontSize: 13,
+                  background: 'rgba(255,255,255,0.10)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.60)',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.18)'
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.60)'
+                }}
+              >
+                {q}
+              </span>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* ===== 页脚 ===== */}
+      <footer
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          textAlign: 'center',
+          padding: '20px 40px',
+          color: 'rgba(255,255,255,0.30)',
+          fontSize: 12,
+        }}
+      >
         河海大学 · 校园智能问答平台 &copy; {new Date().getFullYear()}
       </footer>
 
-      {/* 浮动问答按钮 */}
+      {/* ===== 右下角机器人悬浮按钮 ===== */}
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
@@ -578,11 +725,11 @@ export default function HomePage() {
             height: 60,
             border: 'none',
             borderRadius: 18,
-            background: 'linear-gradient(135deg, #005BAC 0%, #0ea5e9 100%)',
-            color: '#fff',
+            background: '#ffffff',
+            color: '#005BAC',
             fontSize: 28,
             cursor: 'pointer',
-            boxShadow: '0 8px 28px rgba(0,91,172,0.40)',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.25)',
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
@@ -591,18 +738,18 @@ export default function HomePage() {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.08)'
-            e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,91,172,0.50)'
+            e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.35)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,91,172,0.40)'
+            e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,0,0,0.25)'
           }}
         >
           <RobotOutlined />
         </button>
       )}
 
-      {/* 聊天窗口（含侧边栏） */}
+      {/* ===== 聊天窗口（保持原有逻辑） ===== */}
       {chatOpen && (
         <Card
           title={

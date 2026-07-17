@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.common.Result;
 import com.hhu.campusqa.entity.Conversation;
+import com.hhu.campusqa.entity.KbDocument;
 import com.hhu.campusqa.entity.QaRecord;
+import com.hhu.campusqa.entity.SysUser;
 import com.hhu.campusqa.service.KbDocumentService;
 import com.hhu.campusqa.service.QaService;
 import com.hhu.campusqa.service.RagService;
@@ -15,8 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 管理后台专用接口（统计、全量问答记录、索引重建）
@@ -54,11 +56,96 @@ public class AdminController {
                 .ge(QaRecord::getCreateTime, todayStart)
                 .count();
 
+        // TODO: feedback 列尚未建，暂返回 0
+        double positiveRate = 0.0;
+
+        // 向量库规模
+        int vectorStoreSize = ragService.getVectorStoreSize();
+
         Map<String, Object> data = new HashMap<>();
         data.put("userCount", userCount);
         data.put("documentCount", documentCount);
         data.put("qaCount", qaCount);
         data.put("todayQaCount", todayQaCount);
+        data.put("positiveRate", positiveRate);
+        data.put("vectorStoreSize", vectorStoreSize);
+        return Result.success(data);
+    }
+
+    /** 仪表盘趋势数据（最近 7 天） */
+    @GetMapping("/stats/trend")
+    public Result<Map<String, Object>> trend(HttpServletRequest request) {
+        checkAdmin(request);
+
+        // 生成最近 7 天的日期列表（含今天）
+        LocalDate today = LocalDate.now();
+        List<LocalDate> last7Days = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            last7Days.add(today.minusDays(i));
+        }
+
+        // --- QA 趋势：按天统计（排除 feedback 列，数据库表中无此字段）---
+        LocalDateTime weekStart = LocalDateTime.of(today.minusDays(6), LocalTime.MIN);
+        List<QaRecord> weekQaRecords = qaService.lambdaQuery()
+                .ge(QaRecord::getCreateTime, weekStart)
+                .select(QaRecord.class, info -> !info.getColumn().equals("feedback"))
+                .list();
+        Map<LocalDate, Long> qaByDay = weekQaRecords.stream()
+                .collect(Collectors.groupingBy(
+                        r -> r.getCreateTime().toLocalDate(),
+                        Collectors.counting()
+                ));
+        List<Map<String, Object>> qaTrend = last7Days.stream().map(d -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("date", d.toString());
+            item.put("count", qaByDay.getOrDefault(d, 0L));
+            return item;
+        }).collect(Collectors.toList());
+
+        // --- 用户注册趋势：按天统计 ---
+        List<SysUser> weekUsers = sysUserService.lambdaQuery()
+                .ge(SysUser::getCreateTime, weekStart)
+                .list();
+        Map<LocalDate, Long> userByDay = weekUsers.stream()
+                .collect(Collectors.groupingBy(
+                        u -> u.getCreateTime().toLocalDate(),
+                        Collectors.counting()
+                ));
+        List<Map<String, Object>> userTrend = last7Days.stream().map(d -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("date", d.toString());
+            item.put("count", userByDay.getOrDefault(d, 0L));
+            return item;
+        }).collect(Collectors.toList());
+
+        // --- 文档状态分布 ---
+        long docProcessing = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getStatus, "PROCESSING").count();
+        long docReady = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getStatus, "READY").count();
+        long docError = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getStatus, "ERROR").count();
+
+        Map<String, Long> docStatus = new LinkedHashMap<>();
+        docStatus.put("ready", docReady);
+        docStatus.put("processing", docProcessing);
+        docStatus.put("error", docError);
+
+        // --- 反馈分布（feedback 列尚未建，暂全为 0）---
+        long fbPositive = 0;
+        long fbNegative = 0;
+        long fbNeutral = 0;
+
+        Map<String, Long> feedbackDist = new LinkedHashMap<>();
+        feedbackDist.put("positive", fbPositive);
+        feedbackDist.put("negative", fbNegative);
+        feedbackDist.put("neutral", fbNeutral);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("qaTrend", qaTrend);
+        data.put("userTrend", userTrend);
+        data.put("docStatus", docStatus);
+        data.put("feedbackDist", feedbackDist);
         return Result.success(data);
     }
 

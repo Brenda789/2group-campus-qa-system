@@ -37,6 +37,11 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes welcomeSlideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Card hover lift */
 .ant-card {
   transition: box-shadow 0.3s ease, transform 0.3s ease !important;
@@ -64,4 +69,523 @@ body {
 .ant-btn-primary:hover {
   box-shadow: 0 6px 20px rgba(0, 91, 172, 0.35) !important;
   transform: translateY(-1px);
+}
+
+/* ===== Neumorphism (Soft UI) Design System ===== */
+:root {
+  --neu-bg: #0d2b4a;
+  --neu-shadow-light: #173a5c;
+  --neu-shadow-dark: #041826;
+  --neu-shadow-light-soft: rgba(23, 58, 92, 0.55);
+  --neu-shadow-dark-soft: rgba(4, 24, 38, 0.65);
+  --neu-accent: #4da3e0;
+  --neu-text: #c8ddf0;
+  --neu-text-secondary: rgba(200, 221, 240, 0.55);
+  --neu-text-hint: rgba(200, 221, 240, 0.32);
+}
+
+/* ===== Aurora Gradient 极光背景 ===== */
+@keyframes aurora1 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  25%  { transform: translate(8%, -6%) scale(1.12); }
+  50%  { transform: translate(-4%, 4%) scale(0.94); }
+  75%  { transform: translate(6%, 2%) scale(1.08); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora2 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  33%  { transform: translate(-6%, -8%) scale(1.15); }
+  66%  { transform: translate(4%, 6%) scale(0.92); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora3 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  30%  { transform: translate(10%, 4%) scale(1.10); }
+  60%  { transform: translate(-8%, -2%) scale(0.88); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora4 {
+  0%   { transform: translate(0%, 0%) scale(1) rotate(0deg); }
+  50%  { transform: translate(-5%, 8%) scale(1.18) rotate(3deg); }
+  100% { transform: translate(0%, 0%) scale(1) rotate(0deg); }
+}
+
+/* 极光容器 */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #060b14;
+}
+
+/* 极光光斑 — 超大模糊渐变球 */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  will-change: transform;
+}
+.aurora-blob:nth-child(1) {
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, rgba(30, 60, 140, 0.9) 0%, rgba(20, 30, 80, 0.3) 50%, transparent 100%);
+  top: -15%; left: -10%;
+  animation: aurora1 14s ease-in-out infinite;
+}
+.aurora-blob:nth-child(2) {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(80, 30, 120, 0.8) 0%, rgba(40, 15, 70, 0.25) 50%, transparent 100%);
+  top: 35%; right: -15%;
+  animation: aurora2 18s ease-in-out infinite;
+}
+.aurora-blob:nth-child(3) {
+  width: 550px; height: 550px;
+  background: radial-gradient(circle, rgba(25, 50, 130, 0.85) 0%, rgba(15, 20, 60, 0.2) 55%, transparent 100%);
+  bottom: -20%; left: 20%;
+  animation: aurora3 16s ease-in-out infinite;
+}
+.aurora-blob:nth-child(4) {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(55, 25, 100, 0.75) 0%, rgba(30, 10, 55, 0.2) 50%, transparent 100%);
+  top: 50%; left: 30%;
+  animation: aurora4 20s ease-in-out infinite;
+}
+
+/* 极光遮罩暗角 — 让中心亮、四周暗 */
+.aurora-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(6, 11, 20, 0.55) 100%);
+  pointer-events: none;
+}
+
+/* 凸起卡片 — 从背景中"浮出" */
+.neu-card-raised {
+  background: var(--neu-bg);
+  border-radius: 22px;
+  box-shadow:
+    8px 8px 18px var(--neu-shadow-dark),
+    -6px -6px 16px var(--neu-shadow-light);
+  border: none;
+  transition: box-shadow 0.3s ease;
+}
+
+/* 凹陷输入框 — 像被"按进"背景 */
+.neu-input-inset {
+  background: var(--neu-bg) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow:
+    inset 3px 3px 7px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light) !important;
+  color: var(--neu-text) !important;
+  transition: box-shadow 0.25s ease !important;
+}
+.neu-input-inset:focus,
+.neu-input-inset.ant-input-affix-wrapper-focused {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -1px -1px 4px var(--neu-shadow-light),
+    0 0 0 2px rgba(77, 163, 224, 0.25) !important;
+}
+.neu-input-inset input {
+  background: transparent !important;
+  color: var(--neu-text) !important;
+}
+.neu-input-inset .ant-input-prefix {
+  color: var(--neu-text-secondary) !important;
+}
+.neu-input-inset .ant-input-suffix {
+  color: var(--neu-text-hint) !important;
+}
+.neu-input-inset input::placeholder {
+  color: var(--neu-text-hint) !important;
+}
+
+/* Neumorphism 按钮 — 凸起，按下时变凹陷 */
+.neu-btn-raised {
+  background: var(--neu-bg) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow:
+    6px 6px 12px var(--neu-shadow-dark),
+    -4px -4px 10px var(--neu-shadow-light) !important;
+  color: var(--neu-accent) !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+.neu-btn-raised:hover {
+  color: #6cb8ee !important;
+  box-shadow:
+    7px 7px 14px var(--neu-shadow-dark),
+    -5px -5px 12px var(--neu-shadow-light) !important;
+}
+.neu-btn-raised:active {
+  box-shadow:
+    inset 4px 4px 8px var(--neu-shadow-dark),
+    inset -3px -3px 6px var(--neu-shadow-light) !important;
+  transform: scale(0.98);
+}
+
+/* Tabs — 扁平 neumorphism 风格 */
+.neu-tabs .ant-tabs-nav::before {
+  border-bottom-color: var(--neu-shadow-dark) !important;
+}
+.neu-tabs .ant-tabs-tab {
+  color: var(--neu-text-secondary) !important;
+  font-weight: 500;
+  transition: color 0.25s ease;
+}
+.neu-tabs .ant-tabs-tab:hover {
+  color: var(--neu-text) !important;
+}
+.neu-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--neu-accent) !important;
+}
+.neu-tabs .ant-tabs-ink-bar {
+  background: var(--neu-accent) !important;
+}
+
+/* Checkbox */
+.neu-check {
+  color: var(--neu-text-secondary) !important;
+}
+
+/* ================================================================
+   iOS 18 Liquid Glass Design System — 液态玻璃效果
+   Colors: #c4e1dd (mint) · #143284 (deep navy) · #6183ab (steel)
+   ================================================================ */
+:root {
+  --glass-mint: #c4e1dd;
+  --glass-navy: #143284;
+  --glass-steel: #6183ab;
+  --glass-navy-deep: #0c1f52;
+  --glass-white-soft: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-border-strong: rgba(255, 255, 255, 0.28);
+  --glass-shadow: rgba(20, 50, 132, 0.12);
+  --glass-shadow-strong: rgba(20, 50, 132, 0.22);
+}
+
+/* ===== iOS 风格背景 ===== */
+.ios-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(160deg, #0c1f52 0%, #143284 30%, #6183ab 65%, #c4e1dd 100%);
+}
+
+/* 柔和光晕 — 模拟 iOS 背景散景 */
+.ios-bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.3;
+  will-change: transform;
+  animation: iosOrbFloat 16s ease-in-out infinite;
+}
+.ios-bg-orb:nth-child(1) {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, rgba(196, 225, 221, 0.5) 0%, transparent 70%);
+  top: -8%; left: -5%;
+  animation-delay: 0s;
+}
+.ios-bg-orb:nth-child(2) {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(97, 131, 171, 0.45) 0%, transparent 70%);
+  bottom: -10%; right: -8%;
+  animation-delay: -7s;
+}
+.ios-bg-orb:nth-child(3) {
+  width: 340px; height: 340px;
+  background: radial-gradient(circle, rgba(196, 225, 221, 0.35) 0%, transparent 70%);
+  top: 55%; left: 40%;
+  animation-delay: -12s;
+}
+
+@keyframes iosOrbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(3%, -4%) scale(1.06); }
+  50%  { transform: translate(-2%, 2%) scale(0.96); }
+  75%  { transform: translate(4%, 1%) scale(1.04); }
+}
+
+/* ===== 导航栏文字按钮 — 默认纯文字，悬停圆形展开 ===== */
+.nav-text-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 6px 18px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.38s cubic-bezier(0.22, 0.05, 0.19, 1);
+  outline: none;
+  line-height: 1.4;
+}
+.nav-text-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #fff;
+  transform: scale(1.06);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+}
+.nav-text-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ===== Frozen Glass 卡片 — 冰冻玻璃 · 厚霜质感 ===== */
+.glass-card {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(44px) saturate(140%);
+  -webkit-backdrop-filter: blur(44px) saturate(140%);
+  border: 1.5px solid rgba(255, 255, 255, 0.30);
+  border-radius: 24px;
+  box-shadow:
+    0 16px 48px rgba(20, 50, 132, 0.22),
+    0 4px 16px rgba(20, 50, 132, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    0 20px 56px rgba(20, 50, 132, 0.28),
+    0 6px 20px rgba(20, 50, 132, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 2px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+/* ===== Frozen Glass 输入框 ===== */
+.glass-input {
+  background: rgba(255, 255, 255, 0.13) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 14px !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  transition: all 0.3s ease !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.glass-input:hover {
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  background: rgba(255, 255, 255, 0.17) !important;
+}
+.glass-input:focus,
+.glass-input.ant-input-affix-wrapper-focused,
+.glass-input.ant-input-affix-wrapper:focus,
+.glass-input.ant-input-affix-wrapper:focus-within,
+.glass-input.ant-input-outlined:focus,
+.glass-input.ant-input-outlined:focus-within {
+  border-color: rgba(196, 225, 221, 0.55) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.glass-input.ant-input-status-success,
+.glass-input.ant-input-status-error,
+.glass-input.ant-input-status-warning {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+.glass-input input,
+.glass-input textarea {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+.glass-input input:focus,
+.glass-input textarea:focus,
+.glass-input input:focus-visible,
+.glass-input textarea:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.glass-input::after,
+.glass-input::before,
+.glass-input:focus::after,
+.glass-input:focus::before,
+.glass-input.ant-input-affix-wrapper-focused::after,
+.glass-input.ant-input-affix-wrapper-focused::before {
+  display: none !important;
+  content: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+.glass-input input:-webkit-autofill,
+.glass-input input:-webkit-autofill:hover,
+.glass-input input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.13) inset !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+.glass-input .ant-input-prefix,
+.glass-input .ant-input-suffix {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+.glass-input input::placeholder {
+  color: rgba(255, 255, 255, 0.30) !important;
+}
+
+/* ===== 液态玻璃搜索框 ===== */
+.liquid-search {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.18);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+  padding: 0 8px 0 20px;
+  transition: all 0.3s ease;
+}
+.liquid-search:focus-within {
+  border-color: rgba(196, 225, 221, 0.55);
+  box-shadow: 0 0 0 4px rgba(196, 225, 221, 0.13);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* 输入文字 */
+.liquid-search-input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  line-height: 56px;
+  padding: 0;
+}
+.liquid-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.30);
+}
+
+/* 深绿色圆形纸飞机按钮 */
+.liquid-search-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #0A2E0C;
+  color: #c4e1dd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(10, 46, 12, 0.45);
+  outline: none;
+}
+.liquid-search-btn:hover {
+  background: #143A18;
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(10, 46, 12, 0.60);
+  transform: scale(1.06);
+}
+.liquid-search-btn:active {
+  background: #0A2E0C;
+  transform: scale(0.97);
+}
+
+/* ===== Frozen Glass 按钮 ===== */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 16px !important;
+  color: #ffffff !important;
+  font-weight: 590 !important;
+  font-size: 16px !important;
+  letter-spacing: -0.2px;
+  box-shadow:
+    0 4px 20px rgba(20, 50, 132, 0.18),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.22) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+}
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-color: rgba(255, 255, 255, 0.40) !important;
+  box-shadow:
+    0 8px 28px rgba(20, 50, 132, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.30) !important;
+  transform: translateY(-1px);
+}
+.glass-btn:active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  transform: scale(0.98);
+  box-shadow:
+    0 2px 8px rgba(20, 50, 132, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+}
+
+/* ===== 液态玻璃 Tabs ===== */
+.glass-tabs .ant-tabs-nav::before {
+  border-bottom-color: rgba(255, 255, 255, 0.10) !important;
+}
+.glass-tabs .ant-tabs-tab {
+  color: rgba(255, 255, 255, 0.50) !important;
+  font-weight: 500;
+  font-size: 15px;
+  transition: color 0.3s ease;
+  letter-spacing: -0.2px;
+}
+.glass-tabs .ant-tabs-tab:hover {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+.glass-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #c4e1dd !important;
+  font-weight: 590;
+}
+.glass-tabs .ant-tabs-ink-bar {
+  background: #c4e1dd !important;
+  height: 2px !important;
+  border-radius: 1px;
+}
+
+/* ===== iOS 风格 Checkbox ===== */
+.glass-check .ant-checkbox-inner {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+  border-radius: 6px !important;
+}
+.glass-check .ant-checkbox-checked .ant-checkbox-inner {
+  background: #c4e1dd !important;
+  border-color: #c4e1dd !important;
+}
+.glass-check .ant-checkbox-checked .ant-checkbox-inner::after {
+  border-color: #143284 !important;
+}
+.glass-check span:not(.ant-checkbox-inner) {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* ===== Frozen Glass 图标容器 — 冰霜光晕 ===== */
+.glass-icon-circle {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+  box-shadow:
+    0 4px 16px rgba(20, 50, 132, 0.14),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.22);
 }

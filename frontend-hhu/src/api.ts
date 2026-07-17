@@ -49,10 +49,15 @@ export const userApi = {
   remove: (userId: number) =>
     request.delete(`/user/${userId}`),
 
-  /** 编辑用户信息（邮箱、角色）
+  /** 编辑用户信息（用户名、邮箱、角色）
    *  不设 mock 降级——写操作必须透传后端错误。 */
-  update: (userId: number, payload: { email?: string; role?: string }) =>
+  update: (userId: number, payload: { email?: string; role?: string; username?: string }) =>
     request.put(`/user/${userId}`, payload),
+
+  /** 管理员重置用户密码（不需旧密码）
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  resetPassword: (userId: number, newPassword: string) =>
+    request.put(`/user/${userId}/password`, { newPassword }),
 
   /** 当前用户信息 */
   me: () => request.get('/user/me').catch(() => {
@@ -65,10 +70,10 @@ export const userApi = {
   changePassword: (oldPassword: string, newPassword: string) =>
     request.put('/user/password', { oldPassword, newPassword }),
 
-  /** 修改个人信息（邮箱）
+  /** 修改个人信息（用户名、邮箱）
    *  不设 mock 降级——写操作必须透传后端错误。 */
-  updateProfile: (email: string) =>
-    request.put('/user/profile', { email }),
+  updateProfile: (payload: { email?: string; username?: string }) =>
+    request.put('/user/profile', payload),
 }
 
 // ==================== 问答 ====================
@@ -151,10 +156,21 @@ export const docApi = {
 
 // ==================== 管理后台（Admin） ====================
 export const adminApi = {
-  /** 仪表盘统计 → { userCount, documentCount, qaCount, todayQaCount } */
+  /** 仪表盘统计 → { userCount, documentCount, qaCount, todayQaCount, positiveRate, vectorStoreSize } */
   stats: () => request.get('/admin/stats').catch(() => {
     console.warn(`${MOCK_PREFIX} admin stats fallback`)
-    return { userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0 }
+    return { userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0, positiveRate: 0, vectorStoreSize: 0 }
+  }),
+
+  /** 仪表盘趋势数据（最近 7 天） */
+  trend: () => request.get('/admin/stats/trend').catch(() => {
+    console.warn(`${MOCK_PREFIX} admin trend fallback`)
+    return {
+      qaTrend: [],
+      userTrend: [],
+      docStatus: { ready: 0, processing: 0, error: 0 },
+      feedbackDist: { positive: 0, negative: 0, neutral: 0 },
+    }
   }),
 
   /** 全量问答记录分页 → Page<QaRecord>，支持关键词搜索 */
