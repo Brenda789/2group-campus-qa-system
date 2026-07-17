@@ -26,7 +26,7 @@ function readStoredUser(): AuthUser {
     const parsed = JSON.parse(raw) as Partial<AuthUser>
     return {
       username: parsed.username || '',
-      role: parsed.role === 'admin' ? 'admin' : 'user',
+      role: parsed.role?.toLowerCase() === 'admin' ? 'admin' : 'user',
     }
   } catch {
     return defaultUser

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Table, Tag, Button, Input, Space, message, Popconfirm, Card, Typography, Modal, Form, Select, Switch } from 'antd'
 import { UserOutlined, CheckCircleOutlined, StopOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
-import { userApi, authApi } from '../api'
+import { userApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text } = Typography
@@ -63,7 +63,7 @@ export default function UserList() {
   const openCreate = () => {
     setEditingUser(null)
     form.resetFields()
-    form.setFieldsValue({ role: 'USER' })
+    form.setFieldsValue({ role: 'user' })
     setModalOpen(true)
   }
 
@@ -85,7 +85,7 @@ export default function UserList() {
         await userApi.update(editingUser.id, { email: values.email, role: values.role })
         message.success('编辑成功')
       } else {
-        await authApi.register(values.username, values.password, values.email || '')
+        await userApi.create(values.username, values.password, values.email || '', values.role || 'user')
         message.success('新增成功')
       }
       setModalOpen(false)
@@ -123,9 +123,10 @@ export default function UserList() {
       title: '角色',
       dataIndex: 'role',
       width: 100,
-      render: (role: string) => (
-        <Tag color={role === 'ADMIN' ? 'blue' : 'default'}>{role === 'ADMIN' ? '管理员' : '普通用户'}</Tag>
-      ),
+      render: (role: string) => {
+        const isAdminRole = role?.toLowerCase() === 'admin'
+        return <Tag color={isAdminRole ? 'blue' : 'default'}>{isAdminRole ? '管理员' : '普通用户'}</Tag>
+      },
     },
     {
       title: '状态',
@@ -249,8 +250,8 @@ export default function UserList() {
             <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
               <Select
                 options={[
-                  { label: '普通用户', value: 'USER' },
-                  { label: '管理员', value: 'ADMIN' },
+                  { label: '普通用户', value: 'user' },
+                  { label: '管理员', value: 'admin' },
                 ]}
               />
             </Form.Item>

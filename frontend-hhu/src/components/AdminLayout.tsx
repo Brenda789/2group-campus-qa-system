@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Button, Dropdown, Avatar, Space, Tag } from 'antd'
+import { Layout, Menu, Button, Dropdown, Avatar, Space, Tag, Alert } from 'antd'
 import {
   DashboardOutlined,
   HomeOutlined,
@@ -11,17 +11,27 @@ import {
   MenuUnfoldOutlined,
   CommentOutlined,
 } from '@ant-design/icons'
+import { useAuth } from '../contexts/AuthContext'
 
 const { Sider, Header, Content } = Layout
 
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [offline, setOffline] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, role, logout } = useAuth()
 
-  const userStr = localStorage.getItem('user')
-  const user = userStr ? JSON.parse(userStr) : {}
-  const role = localStorage.getItem('role') || 'user'
+  // 检测后端是否可达
+  useEffect(() => {
+    fetch('/api/health')
+      .then((res) => {
+        setOffline(!res.ok)
+      })
+      .catch(() => {
+        setOffline(true)
+      })
+  }, [])
 
   const getSelectedKey = () => {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users'
@@ -44,9 +54,7 @@ export default function AdminLayout() {
   const handleMenuClick = ({ key }: { key: string }) => navigate(key)
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    localStorage.removeItem('role')
+    logout()
     navigate('/login')
   }
 
@@ -208,6 +216,16 @@ export default function AdminLayout() {
             boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
           }}
         >
+          {offline && (
+            <Alert
+              type="warning"
+              showIcon
+              message="后端服务未连接"
+              description="当前为离线演示模式，显示的数据均为空占位，请启动后端服务后刷新页面以获取真实数据。"
+              style={{ marginBottom: 16, borderRadius: 10 }}
+              closable
+            />
+          )}
           <Outlet />
         </Content>
       </Layout>

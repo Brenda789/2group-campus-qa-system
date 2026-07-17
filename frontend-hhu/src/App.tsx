@@ -86,7 +86,7 @@ function AppRoutes() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={isLoggedIn ? <HomePage /> : <Navigate to="/login" replace />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin" element={<AdminPage />}>
           <Route index element={<Dashboard />} />

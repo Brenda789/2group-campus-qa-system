@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Input, Card, message, Space, Tag, Row, Col, Typography, Spin, Modal } from 'antd'
 import {
   RobotOutlined,
@@ -14,6 +15,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons'
 import { chatApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -46,6 +48,8 @@ const features = [
 
 /** 前台门户首页 + 浮动问答机器人（侧边栏版） */
 export default function HomePage() {
+  const navigate = useNavigate()
+  const { isLoggedIn, user, logout } = useAuth()
   const [chatOpen, setChatOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -61,10 +65,31 @@ export default function HomePage() {
     msgEnd.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 打开聊天窗口时加载会话列表
+  // 打开聊天窗口时加载会话列表（仅登录用户）
   useEffect(() => {
-    if (chatOpen) loadConversations()
-  }, [chatOpen])
+    if (chatOpen && isLoggedIn) loadConversations()
+  }, [chatOpen, isLoggedIn])
+
+  /** 统一入口：需要登录才能使用问答 */
+  const handleOpenChat = () => {
+    if (!isLoggedIn) {
+      message.info('请先登录后使用问答功能')
+      navigate('/login')
+      return
+    }
+    setChatOpen(true)
+  }
+
+  /** 快捷问题点击也需要登录校验 */
+  const handleQuickQuestion = (q: string) => {
+    if (!isLoggedIn) {
+      message.info('请先登录后使用问答功能')
+      navigate('/login')
+      return
+    }
+    setChatOpen(true)
+    setTimeout(() => send(q), 300)
+  }
 
   const loadConversations = async () => {
     try {
@@ -95,6 +120,11 @@ export default function HomePage() {
 
   // ==================== 发送消息 ====================
   const send = async (text: string) => {
+    if (!isLoggedIn) {
+      message.info('请先登录后使用问答功能')
+      navigate('/login')
+      return
+    }
     if (!text.trim() || loading) return
     const q = text.trim()
     setInput('')
@@ -177,18 +207,58 @@ export default function HomePage() {
           <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>河海大学</span>
         </div>
         <Space>
-          <Button
-            type="primary"
-            ghost
-            href="#/login"
-            icon={<SafetyOutlined />}
-            style={{
-              borderRadius: 8, fontWeight: 600, fontSize: 14,
-              borderColor: '#7dd3fc', color: '#7dd3fc',
-            }}
-          >
-            管理后台
-          </Button>
+          {isLoggedIn ? (
+            <>
+              <span style={{ color: '#a5d8ff', fontSize: 14, fontWeight: 500 }}>
+                👋 {user.username}
+              </span>
+              <Button
+                type="primary"
+                ghost
+                onClick={() => navigate('/admin')}
+                icon={<SafetyOutlined />}
+                style={{
+                  borderRadius: 8, fontWeight: 600, fontSize: 14,
+                  borderColor: '#7dd3fc', color: '#7dd3fc',
+                }}
+              >
+                管理后台
+              </Button>
+              <Button
+                type="text"
+                onClick={() => { logout(); navigate('/'); }}
+                style={{ color: '#94a3b8', fontWeight: 500 }}
+              >
+                退出
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="primary"
+                ghost
+                onClick={() => navigate('/login')}
+                style={{
+                  borderRadius: 8, fontWeight: 600, fontSize: 14,
+                  borderColor: '#7dd3fc', color: '#7dd3fc',
+                }}
+              >
+                登录
+              </Button>
+              <Button
+                type="primary"
+                ghost
+                onClick={() => navigate('/login')}
+                icon={<SafetyOutlined />}
+                style={{
+                  borderRadius: 8, fontWeight: 600, fontSize: 14,
+                  borderColor: '#7dd3fc', color: '#7dd3fc',
+                }}
+              >
+                管理后台
+              </Button>
+            </>
+          )}
         </Space>
       </header>
 
@@ -275,7 +345,7 @@ export default function HomePage() {
                       cursor: 'pointer', borderRadius: 20, padding: '4px 14px',
                       fontSize: 13, border: '1px solid #dbeafe', background: '#eff6ff', color: '#005BAC',
                     }}
-                    onClick={() => { setChatOpen(true); setTimeout(() => send(q), 300) }}
+                    onClick={() => handleQuickQuestion(q)}
                   >
                     {q}
                   </Tag>
@@ -287,7 +357,7 @@ export default function HomePage() {
                 type="primary"
                 size="large"
                 icon={<RobotOutlined />}
-                onClick={() => setChatOpen(true)}
+                onClick={handleOpenChat}
                 style={{
                   borderRadius: 30, height: 52, padding: '0 32px', fontSize: 16, fontWeight: 600,
                   background: 'linear-gradient(135deg, #005BAC, #0ea5e9)',
@@ -313,7 +383,7 @@ export default function HomePage() {
       {/* 浮动问答按钮 */}
       {!chatOpen && (
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={handleOpenChat}
           style={{
             position: 'fixed',
             right: 28,
@@ -378,7 +448,7 @@ export default function HomePage() {
           }}
           styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden' } }}
         >
-          {/* ======== 左侧：会话列表 ======== */}
+          {/* ======== 左侧：会话列表（需登录） ======== */}
           <div
             style={{
               width: 200,
@@ -389,82 +459,94 @@ export default function HomePage() {
               background: '#fafafa',
             }}
           >
-            {/* 新对话按钮 */}
-            <div style={{ padding: 12 }}>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                block
-                onClick={newConversation}
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                新对话
-              </Button>
-            </div>
-
-            {/* 会话列表 */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  onClick={() => selectConversation(conv.id)}
-                  onMouseEnter={() => setHoveredConv(conv.id)}
-                  onMouseLeave={() => setHoveredConv(null)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    marginBottom: 2,
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    background: activeConvId === conv.id ? '#e6f0ff' : 'transparent',
-                    border: activeConvId === conv.id ? '1px solid #b3d4ff' : '1px solid transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span
-                    style={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontSize: 13,
-                      color: activeConvId === conv.id ? '#005BAC' : '#333',
-                      fontWeight: activeConvId === conv.id ? 500 : 400,
-                    }}
+            {!isLoggedIn ? (
+              <div style={{ textAlign: 'center', padding: '40px 16px', color: '#999', fontSize: 13 }}>
+                <SafetyOutlined style={{ fontSize: 32, marginBottom: 12, color: '#bbb' }} />
+                <p>请先登录后<br />使用问答功能</p>
+                <Button type="primary" size="small" onClick={() => navigate('/login')} style={{ marginTop: 8 }}>
+                  去登录
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* 新对话按钮 */}
+                <div style={{ padding: 12 }}>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    block
+                    onClick={newConversation}
+                    style={{ whiteSpace: 'nowrap' }}
                   >
-                    <MessageOutlined style={{ marginRight: 6, fontSize: 12, color: '#999' }} />
-                    {conv.title}
-                  </span>
-                  <DeleteOutlined
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      Modal.confirm({
-                        title: '确定删除该会话？',
-                        content: '删除后无法恢复',
-                        okText: '删除',
-                        okType: 'danger',
-                        cancelText: '取消',
-                        onOk: () => deleteConversation(conv.id),
-                      })
-                    }}
-                    style={{
-                      fontSize: 12,
-                      color: hoveredConv === conv.id ? '#ff4d4f' : '#bbb',
-                      cursor: 'pointer',
-                      marginLeft: 4,
-                      transition: 'color 0.15s',
-                    }}
-                  />
+                    新对话
+                  </Button>
                 </div>
-              ))}
-              {conversations.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#bbb', fontSize: 12, marginTop: 24 }}>
-                  暂无历史会话
+
+                {/* 会话列表 */}
+                <div style={{ flex: 1, overflow: 'auto', padding: '0 8px' }}>
+                  {conversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      onClick={() => selectConversation(conv.id)}
+                      onMouseEnter={() => setHoveredConv(conv.id)}
+                      onMouseLeave={() => setHoveredConv(null)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 10px',
+                        marginBottom: 2,
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        background: activeConvId === conv.id ? '#e6f0ff' : 'transparent',
+                        border: activeConvId === conv.id ? '1px solid #b3d4ff' : '1px solid transparent',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span
+                        style={{
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: 13,
+                          color: activeConvId === conv.id ? '#005BAC' : '#333',
+                          fontWeight: activeConvId === conv.id ? 500 : 400,
+                        }}
+                      >
+                        <MessageOutlined style={{ marginRight: 6, fontSize: 12, color: '#999' }} />
+                        {conv.title}
+                      </span>
+                      <DeleteOutlined
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          Modal.confirm({
+                            title: '确定删除该会话？',
+                            content: '删除后无法恢复',
+                            okText: '删除',
+                            okType: 'danger',
+                            cancelText: '取消',
+                            onOk: () => deleteConversation(conv.id),
+                          })
+                        }}
+                        style={{
+                          fontSize: 12,
+                          color: hoveredConv === conv.id ? '#ff4d4f' : '#bbb',
+                          cursor: 'pointer',
+                          marginLeft: 4,
+                          transition: 'color 0.15s',
+                        }}
+                      />
+                    </div>
+                  ))}
+                  {conversations.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#bbb', fontSize: 12, marginTop: 24 }}>
+                      暂无历史会话
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {/* ======== 右侧：对话区 ======== */}
