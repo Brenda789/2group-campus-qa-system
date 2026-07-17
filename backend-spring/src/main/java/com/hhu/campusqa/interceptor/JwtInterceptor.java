@@ -22,12 +22,26 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Resource
     private JwtUtil jwtUtil;
 
+    /** 可选认证路径：没有 token 也放行，controller 自行判断 */
+    private static final java.util.Set<String> OPTIONAL_AUTH_PATHS = java.util.Set.of(
+            "/api/chat/ask",
+            "/api/chat/stream",
+            "/api/documents"
+    );
+
     @Override
     public boolean preHandle(HttpServletRequest request,
                              HttpServletResponse response,
                              Object handler) {
         String auth = request.getHeader("Authorization");
+        String uri = request.getRequestURI();
+
+        // 没有 token 的情况
         if (auth == null || !auth.startsWith("Bearer ")) {
+            // 可选路径：放行，不设 userId
+            if (isOptionalPath(uri)) {
+                return true;
+            }
             throw new BizException(401, "请先登录");
         }
 
@@ -38,7 +52,18 @@ public class JwtInterceptor implements HandlerInterceptor {
             request.setAttribute("role", claims.get("role", String.class));
             return true;
         } catch (Exception e) {
+            // 可选路径：token 无效也不拦截，降级为匿名
+            if (isOptionalPath(uri)) {
+                return true;
+            }
             throw new BizException(401, "登录状态已失效，请重新登录");
         }
+    }
+
+    private boolean isOptionalPath(String uri) {
+        for (String path : OPTIONAL_AUTH_PATHS) {
+            if (uri.startsWith(path)) return true;
+        }
+        return false;
     }
 }

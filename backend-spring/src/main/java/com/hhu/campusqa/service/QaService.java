@@ -12,6 +12,7 @@ import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.mapper.ConversationMapper;
 import com.hhu.campusqa.mapper.MessageMapper;
 import com.hhu.campusqa.mapper.QaRecordMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,6 +25,7 @@ import java.util.List;
  * 同时维护 qa_record（汇总记录）和 conversation + message（详情）两套表。
  * </p>
  */
+@Slf4j
 @Service
 public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
@@ -81,6 +83,10 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
     /**
      * 问答处理 — 调用 RAG 引擎，返回基于知识库的答案
+     *
+     * @param userId         用户 ID（匿名时为 null）
+     * @param question       用户问题
+     * @param conversationId 会话 ID（匿名时为 null）
      */
     @Transactional
     public QaRecord ask(Long userId, String question, Long conversationId) {
@@ -91,7 +97,17 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         try {
             sourceDocs = objectMapper.writeValueAsString(ragResult.sources());
         } catch (JsonProcessingException e) {
+            log.error("来源序列化失败", e);
             sourceDocs = "[]";
+        }
+
+        // 匿名模式：不存库，直接返回结果对象
+        if (userId == null) {
+            QaRecord record = new QaRecord();
+            record.setQuestion(question);
+            record.setAnswer(answer);
+            record.setSourceDocs(sourceDocs);
+            return record;
         }
 
         // 2. 保存到 qa_record（汇总表）
@@ -104,7 +120,7 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .build();
         save(record);
 
-        // 2. 如果没有传入 conversationId，自动创建新会话
+        // 3. 如果没有传入 conversationId，自动创建新会话
         if (conversationId == null) {
             Conversation conv = Conversation.builder()
                     .userId(userId)
@@ -114,7 +130,7 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
             conversationId = conv.getId();
         }
 
-        // 3. 保存用户消息
+        // 4. 保存用户消息
         Message userMsg = Message.builder()
                 .conversationId(conversationId)
                 .role("user")
@@ -122,7 +138,7 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .build();
         messageMapper.insert(userMsg);
 
-        // 4. 保存 AI 回复
+        // 5. 保存 AI 回复
         Message aiMsg = Message.builder()
                 .conversationId(conversationId)
                 .role("assistant")

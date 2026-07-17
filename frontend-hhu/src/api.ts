@@ -106,8 +106,8 @@ export const chatApi = {
 // ==================== 文档管理 ====================
 export const docApi = {
   /** 分页列表 → { records, total, current, size } */
-  list: (page = 1, size = 10) =>
-    request.get('/documents', { params: { page, size } }).catch(() => {
+  list: (page = 1, size = 10, keyword?: string, status?: string) =>
+    request.get('/documents', { params: { page, size, keyword, status } }).catch(() => {
       console.warn(`${MOCK_PREFIX} doc list fallback page=${page}`)
       return { records: [], total: 0, current: page, size }
     }),
@@ -125,6 +125,9 @@ export const docApi = {
   /** 删除文档
    *  不设 mock 降级——写操作必须透传后端错误。 */
   remove: (id: number) => request.delete(`/documents/${id}`),
+
+  /** 重新处理单个文档 */
+  reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
 }
 
 // ==================== 管理后台（Admin） ====================

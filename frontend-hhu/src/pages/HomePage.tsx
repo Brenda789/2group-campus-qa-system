@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Input, Card, message, Space, Tag, Row, Col, Typography, Spin, Modal } from 'antd'
+import { Button, Input, Card, message, Space, Tag, Row, Col, Typography, Spin, Modal, Upload } from 'antd'
 import {
   RobotOutlined,
   SendOutlined,
@@ -8,13 +8,14 @@ import {
   DeleteOutlined,
   PlusOutlined,
   MessageOutlined,
+  UploadOutlined,
   BookOutlined,
   EnvironmentOutlined,
   TeamOutlined,
   TrophyOutlined,
   SafetyOutlined,
 } from '@ant-design/icons'
-import { chatApi } from '../api'
+import { chatApi, docApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text, Paragraph } = Typography
@@ -58,6 +59,8 @@ export default function HomePage() {
   const [activeConvId, setActiveConvId] = useState<number | null>(null)
   const [convLoading, setConvLoading] = useState(false)
   const [hoveredConv, setHoveredConv] = useState<number | null>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
 
   // 自动滚动到底部
@@ -152,6 +155,21 @@ export default function HomePage() {
     }
   }
 
+  // ==================== 上传文档 ====================
+  const handleUpload = async (info: any) => {
+    const file = info.file as File
+    setUploading(true)
+    try {
+      await docApi.upload(file)
+      message.success('上传成功，正在处理')
+      setUploadOpen(false)
+    } catch (e: any) {
+      message.error(e?.message || '上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   // ==================== 会话操作 ====================
   const selectConversation = (convId: number) => {
     setActiveConvId(convId)
@@ -209,6 +227,17 @@ export default function HomePage() {
         <Space>
           {isLoggedIn ? (
             <>
+              <Button
+                ghost
+                onClick={() => setUploadOpen(true)}
+                icon={<UploadOutlined />}
+                style={{
+                  borderRadius: 8, fontWeight: 600, fontSize: 14,
+                  borderColor: '#7dd3fc', color: '#7dd3fc',
+                }}
+              >
+                上传文档
+              </Button>
               <span style={{ color: '#a5d8ff', fontSize: 14, fontWeight: 500 }}>
                 👋 {user.username}
               </span>
@@ -635,6 +664,30 @@ export default function HomePage() {
           </div>
         </Card>
       )}
+
+      {/* 上传文档 Modal（wsy 的首页快速上传功能） */}
+      <Modal
+        title="上传文档到知识库"
+        open={uploadOpen}
+        onCancel={() => setUploadOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <p style={{ color: '#999', marginBottom: 16 }}>
+          支持 PDF / DOCX / TXT / MD，最大 10MB
+          {!isLoggedIn && '。未登录上传为临时文档，服务重启后清理'}
+        </p>
+        <Upload
+          beforeUpload={() => false}
+          onChange={handleUpload}
+          showUploadList={false}
+          accept=".pdf,.docx,.doc,.txt,.md"
+        >
+          <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
+            选择文件上传
+          </Button>
+        </Upload>
+      </Modal>
     </div>
   )
 }

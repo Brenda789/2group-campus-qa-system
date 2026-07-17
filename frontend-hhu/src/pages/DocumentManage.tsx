@@ -1,9 +1,37 @@
-import { useState, useEffect } from 'react'
-import { Table, Tag, Button, message, Upload, Popconfirm, Card, Typography } from 'antd'
-import { UploadOutlined, ReloadOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
+import { useState, useEffect, useCallback } from 'react'
+import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography } from 'antd'
+import { UploadOutlined, ReloadOutlined, SearchOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { docApi, adminApi } from '../api'
 
 const { Title, Text } = Typography
+
+const statusLabel: Record<string, string> = {
+  READY: '已完成',
+  PROCESSING: '处理中',
+  PARSING: '解析中',
+  SPLITTING: '切片中',
+  EMBEDDING: '向量化中',
+  ERROR: '处理失败',
+}
+
+const statusColor: Record<string, string> = {
+  READY: 'green',
+  PROCESSING: 'blue',
+  PARSING: 'processing',
+  SPLITTING: 'processing',
+  EMBEDDING: 'processing',
+  ERROR: 'red',
+}
+
+const STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'READY', label: '已完成' },
+  { value: 'PROCESSING', label: '处理中' },
+  { value: 'PARSING', label: '解析中' },
+  { value: 'SPLITTING', label: '切片中' },
+  { value: 'EMBEDDING', label: '向量化中' },
+  { value: 'ERROR', label: '处理失败' },
+]
 
 export default function DocumentManage() {
   const [data, setData] = useState<any[]>([])
@@ -12,11 +40,13 @@ export default function DocumentManage() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
+  const [keyword, setKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
-  const load = async (p = 1) => {
+  const load = useCallback(async (p = 1) => {
     setLoading(true)
     try {
-      const res: any = await docApi.list(p, 10)
+      const res: any = await docApi.list(p, 10, keyword || undefined, statusFilter || undefined)
       setData(res.records)
       setTotal(res.total)
       setPage(p)
@@ -25,26 +55,28 @@ export default function DocumentManage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [keyword, statusFilter])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
-  // 有 PROCESSING 状态的文档时，每 2 秒自动刷新
+  // 有进行中文档时，每 2 秒自动刷新
   useEffect(() => {
-    const hasProcessing = data.some((d) => d.status === 'PROCESSING')
-    if (!hasProcessing) return
+    const processing = data.some((d) =>
+      ['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING'].includes(d.status)
+    )
+    if (!processing) return
     const timer = setInterval(() => load(page), 2000)
     return () => clearInterval(timer)
-  }, [data, page])
+  }, [data, page, load])
 
   const handleUpload = async (info: any) => {
     const file = info.file as File
     setUploading(true)
     try {
       await docApi.upload(file)
-      message.success('上传成功')
+      message.success('上传成功，正在处理')
       load(1)
     } catch {
       message.error('上传失败')
@@ -63,6 +95,16 @@ export default function DocumentManage() {
     }
   }
 
+  const handleReprocess = async (id: number) => {
+    try {
+      await docApi.reprocess(id)
+      message.success('已触发重新处理')
+      load(page)
+    } catch {
+      message.error('重新处理失败')
+    }
+  }
+
   const handleRebuild = async () => {
     setRebuilding(true)
     try {
@@ -76,6 +118,16 @@ export default function DocumentManage() {
     }
   }
 
+  const handleSearch = (value: string) => {
+    setKeyword(value)
+    setPage(1)
+  }
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
+
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '文档标题', dataIndex: 'title' },
@@ -87,34 +139,55 @@ export default function DocumentManage() {
     {
       title: '状态',
       dataIndex: 'status',
-      render: (s: string) => {
-        const colorMap: Record<string, string> = {
-          READY: 'green',
-          PROCESSING: 'orange',
-          ERROR: 'red',
-        }
-        return <Tag color={colorMap[s] || 'default'}>{s}</Tag>
-      },
+      render: (s: string) => (
+        <Tag color={statusColor[s] || 'default'}>
+          {['PARSING', 'SPLITTING', 'EMBEDDING'].includes(s) ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#1677ff',
+                  animation: 'pulse 1.2s ease-in-out infinite',
+                }}
+              />
+              {statusLabel[s] || s}
+            </span>
+          ) : (
+            statusLabel[s] || s
+          )}
+        </Tag>
+      ),
     },
     { title: '切块数', dataIndex: 'chunkCount' },
     {
       title: '操作',
       render: (_: any, record: any) => (
-        <Popconfirm
-          title="确定删除该文档？删除后不可恢复"
-          onConfirm={() => handleDelete(record.id)}
-        >
-          <Button size="small" danger>
-            删除
-          </Button>
-        </Popconfirm>
+        <Space size="small">
+          <Popconfirm
+            title="确定重新处理该文档？将重新切分和向量化。"
+            onConfirm={() => handleReprocess(record.id)}
+          >
+            <Button size="small">重新处理</Button>
+          </Popconfirm>
+          <Popconfirm
+            title="确定删除该文档？删除后不可恢复。"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ]
 
   return (
     <>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Title level={3} style={{ marginBottom: 4, fontWeight: 700 }}>
             <FileTextOutlined style={{ marginRight: 10, color: '#005BAC' }} />
@@ -142,10 +215,31 @@ export default function DocumentManage() {
           >
             重建索引
           </Button>
-          <Button onClick={() => load(1)}>刷新</Button>
         </div>
       </div>
-
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <Space>
+          <Input.Search
+            placeholder="搜索文档名称"
+            allowClear
+            onSearch={handleSearch}
+            style={{ width: 220 }}
+            prefix={<SearchOutlined />}
+          />
+          <Select
+            value={statusFilter}
+            onChange={handleStatusChange}
+            options={STATUS_OPTIONS}
+            style={{ width: 120 }}
+          />
+        </Space>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
       <Card style={{ borderRadius: 16, border: '1px solid #eef2f7' }}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
           <InboxOutlined style={{ marginRight: 6 }} />

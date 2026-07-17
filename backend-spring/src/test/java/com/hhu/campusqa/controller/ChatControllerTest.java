@@ -4,6 +4,7 @@ import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.common.GlobalExceptionHandler;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
+import com.hhu.campusqa.service.RagService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -22,12 +23,13 @@ class ChatControllerTest {
 
     private MockMvc mockMvc;
     private final QaService qaService = mock(QaService.class);
+    private final RagService ragService = mock(RagService.class);
 
     private static final Long TEST_USER_ID = 1L;
 
     @BeforeEach
     void setUp() {
-        ChatController controller = new ChatController(qaService);
+        ChatController controller = new ChatController(qaService, ragService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
