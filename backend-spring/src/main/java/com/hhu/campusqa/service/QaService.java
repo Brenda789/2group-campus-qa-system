@@ -84,14 +84,17 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
         updateById(record);
     }
 
-    /** 分页查询当前用户的问答记录 */
-    public Page<QaRecord> pageUserQaRecords(Long userId, int page, int size) {
-        return this.page(
-                new Page<>(page, size),
-                new LambdaQueryWrapper<QaRecord>()
-                        .eq(QaRecord::getUserId, userId)
-                        .orderByDesc(QaRecord::getCreateTime)
-        );
+    /** 分页查询当前用户的问答记录（支持问题和回答关键字模糊搜索） */
+    public Page<QaRecord> pageUserQaRecords(Long userId, int page, int size, String keyword) {
+        LambdaQueryWrapper<QaRecord> qw = new LambdaQueryWrapper<>();
+        qw.eq(QaRecord::getUserId, userId);
+        if (StringUtils.hasText(keyword)) {
+            qw.and(w -> w.like(QaRecord::getQuestion, keyword)
+                          .or()
+                          .like(QaRecord::getAnswer, keyword));
+        }
+        qw.orderByDesc(QaRecord::getCreateTime);
+        return this.page(new Page<>(page, size), qw);
     }
 
     /**
@@ -220,22 +223,27 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
 
     // ==================== Conversation（会话） ====================
 
-    /** 查询某用户的会话列表 */
-    public List<Conversation> getConversations(Long userId) {
-        return conversationMapper.selectList(
-                new LambdaQueryWrapper<Conversation>()
-                        .eq(Conversation::getUserId, userId)
-                        .orderByDesc(Conversation::getUpdateTime)
-        );
+    /** 查询某用户的会话列表（支持按标题关键字模糊搜索） */
+    public List<Conversation> getConversations(Long userId, String keyword) {
+        LambdaQueryWrapper<Conversation> qw = new LambdaQueryWrapper<>();
+        qw.eq(Conversation::getUserId, userId);
+        if (StringUtils.hasText(keyword)) {
+            qw.like(Conversation::getTitle, keyword);
+        }
+        qw.orderByDesc(Conversation::getUpdateTime);
+        return conversationMapper.selectList(qw);
     }
 
-    /** 删除会话及其所有消息 */
+    /** 删除会话及其所有消息和关联的问答记录 */
     @Transactional
     public void deleteConversation(Long conversationId, Long userId) {
         Conversation conv = conversationMapper.selectById(conversationId);
         if (conv == null || !conv.getUserId().equals(userId)) {
             throw new BizException(403, "无权操作该会话");
         }
+        // 删除关联的 qa_record
+        remove(new LambdaQueryWrapper<QaRecord>()
+                .eq(QaRecord::getConversationId, conversationId));
         // 删除消息
         messageMapper.delete(new LambdaQueryWrapper<Message>()
                 .eq(Message::getConversationId, conversationId));

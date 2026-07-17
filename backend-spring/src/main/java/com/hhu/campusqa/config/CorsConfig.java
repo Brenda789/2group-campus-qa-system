@@ -14,8 +14,8 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // 允许来自 5173 端口的请求（你的前端地址）
-        config.addAllowedOrigin("http://localhost:5173");
+        // 允许来自本地前端所有端口的请求
+        config.addAllowedOriginPattern("http://localhost:*");
         // 允许携带凭证（如 Cookie、Token）
         config.setAllowCredentials(true);
         // 允许所有请求头

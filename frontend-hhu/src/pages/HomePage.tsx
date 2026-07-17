@@ -14,6 +14,7 @@ import {
   TeamOutlined,
   TrophyOutlined,
   SafetyOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import { chatApi, docApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
@@ -623,8 +624,10 @@ export default function HomePage() {
             height: 520,
             zIndex: 9998,
             boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+            display: 'flex',
+            flexDirection: 'column',
           }}
-          styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden' } }}
+          styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 } }}
         >
           {/* ======== 左侧：会话列表 ======== */}
           <div
@@ -820,18 +823,25 @@ export default function HomePage() {
           {!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}
         </p>
 
-        {/* 未开始上传：显示上传按钮 */}
+        {/* 未开始上传：显示拖拽上传区域 */}
         {!uploadStatus && (
-          <Upload
+          <Upload.Dragger
             beforeUpload={() => false}
             onChange={handleUpload}
             showUploadList={false}
             accept=".pdf,.docx,.doc,.txt,.md"
+            style={{ padding: '24px 0' }}
           >
-            <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
-              选择文件上传
-            </Button>
-          </Upload>
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined style={{ fontSize: 40, color: '#005BAC' }} />
+            </p>
+            <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>
+              可将上传文件拖拽至此
+            </p>
+            <p className="ant-upload-hint" style={{ color: '#999' }}>
+              或点击此处选择文件上传
+            </p>
+          </Upload.Dragger>
         )}
 
         {/* 上传中 / 处理中：显示进度步骤 */}

@@ -3,6 +3,9 @@ package com.hhu.campusqa.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hhu.campusqa.common.BizException;
 import com.hhu.campusqa.common.Result;
+import com.hhu.campusqa.entity.Conversation;
+import com.hhu.campusqa.entity.KbDocument;
+import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.KbDocumentService;
 import com.hhu.campusqa.service.QaService;
@@ -15,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,17 +43,29 @@ public class AdminController {
         this.ragService = ragService;
     }
 
-    /** 仪表盘统计数据 */
+    /** 仪表盘统计数据（问答、文档只看自己的；管理员额外显示注册用户总数） */
     @GetMapping("/stats")
     public Result<Map<String, Object>> stats(HttpServletRequest request) {
-        checkAdmin(request);
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
 
-        long userCount = sysUserService.count();
-        long documentCount = kbDocumentService.count();
-        long qaCount = qaService.count();
+        // 管理员额外显示注册用户总数
+        long userCount = "admin".equals(role) ? sysUserService.count() : 0;
 
+        // 自己的文档数
+        long documentCount = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getUploadedBy, userId != null ? userId : -1)
+                .count();
+
+        // 自己的问答总数
+        long qaCount = qaService.lambdaQuery()
+                .eq(QaRecord::getUserId, userId)
+                .count();
+
+        // 自己的今日问答数
         LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
         long todayQaCount = qaService.lambdaQuery()
+                .eq(QaRecord::getUserId, userId)
                 .ge(QaRecord::getCreateTime, todayStart)
                 .count();
 
@@ -61,13 +77,14 @@ public class AdminController {
         return Result.success(data);
     }
 
-    /** 我的问答记录（分页，仅查看自己的） */
+    /** 我的问答记录（分页，仅查看自己的，支持关键字模糊搜索问题和回答） */
     @GetMapping("/chat/history")
     public Result<Page<QaRecord>> chatHistory(@RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "10") int size,
+                                              @RequestParam(required = false) String keyword,
                                               HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        return Result.success(qaService.pageUserQaRecords(userId, page, size));
+        return Result.success(qaService.pageUserQaRecords(userId, page, size, keyword));
     }
 
     /** 单条问答详情 */
@@ -88,6 +105,38 @@ public class AdminController {
                                     HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         qaService.deleteQaRecord(id, userId);
+        return Result.success();
+    }
+
+    /** 我的会话列表（分页，用于问答记录管理） */
+    @GetMapping("/chat/conversations")
+    public Result<List<Conversation>> chatConversations(@RequestParam(required = false) String keyword,
+                                                         HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.success(qaService.getConversations(userId, keyword));
+    }
+
+    /** 某会话的所有消息（用于查看完整对话） */
+    @GetMapping("/chat/conversations/{id}/messages")
+    public Result<List<Message>> chatConversationMessages(@PathVariable Long id,
+                                                           HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Conversation conv = qaService.getConversations(userId, null).stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElse(null);
+        if (conv == null) {
+            throw new BizException(404, "会话不存在或无权访问");
+        }
+        return Result.success(qaService.getMessages(id));
+    }
+
+    /** 删除某个会话及其所有消息和问答记录 */
+    @DeleteMapping("/chat/conversations/{id}")
+    public Result<Void> deleteConversation(@PathVariable Long id,
+                                            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        qaService.deleteConversation(id, userId);
         return Result.success();
     }
 

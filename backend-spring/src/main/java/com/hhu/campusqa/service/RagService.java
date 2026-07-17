@@ -236,6 +236,9 @@ public class RagService {
 
             } catch (Throwable e) {
                 log.error("文档 [{}] (id={}) 处理失败，跳过: {}", doc.getTitle(), doc.getId(), e.toString());
+                doc.setStatus("ERROR");
+                doc.setChunkCount(0);
+                kbDocumentMapper.updateById(doc);
             }
         }
 

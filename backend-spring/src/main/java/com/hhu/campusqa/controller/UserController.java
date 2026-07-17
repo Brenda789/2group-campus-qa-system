@@ -125,7 +125,9 @@ public class UserController {
         Long userId = (Long) request.getAttribute("userId");
         String username = (String) request.getAttribute("username");
         String role = (String) request.getAttribute("role");
-        return Result.success(Map.of("id", userId, "username", username, "role", role));
+        SysUser user = sysUserService.getById(userId);
+        String email = (user != null && user.getEmail() != null) ? user.getEmail() : "";
+        return Result.success(Map.of("id", userId, "username", username, "role", role, "email", email));
     }
 
     private void checkAdmin(HttpServletRequest request) {

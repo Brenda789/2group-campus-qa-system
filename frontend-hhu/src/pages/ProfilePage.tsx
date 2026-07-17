@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Card, Form, Input, Button, Typography, Space, message, Divider } from 'antd'
+import { useState, useEffect } from 'react'
+import { Card, Form, Input, Button, Typography, Space, message, Divider, Tag } from 'antd'
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
-import { profileApi } from '../api'
+import { profileApi, userApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text } = Typography
@@ -13,6 +13,16 @@ export default function ProfilePage() {
   const [emailLoading, setEmailLoading] = useState(false)
   const [pwForm] = Form.useForm()
   const [emailForm] = Form.useForm()
+  const [userEmail, setUserEmail] = useState('')
+
+  useEffect(() => {
+    userApi.me().then((info: any) => {
+      if (info?.email) {
+        setUserEmail(info.email)
+        emailForm.setFieldsValue({ email: info.email })
+      }
+    }).catch(() => {})
+  }, [])
 
   const handleChangePassword = async () => {
     try {
@@ -53,6 +63,7 @@ export default function ProfilePage() {
           </Title>
           <Text type="secondary" style={{ fontSize: 14 }}>
             当前用户：{user.username}
+            {userEmail && <Tag style={{ marginLeft: 8 }}>{userEmail}</Tag>}
           </Text>
         </div>
 

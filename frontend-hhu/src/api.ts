@@ -59,6 +59,11 @@ export const userApi = {
     console.warn(`${MOCK_PREFIX} me fallback`)
     return { username: 'admin', role: 'admin' }
   }),
+
+  /** 管理员重置用户密码为 admin123
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  resetPassword: (userId: number) =>
+    request.put(`/user/${userId}/reset-password`),
 }
 
 // ==================== 问答 ====================
@@ -217,9 +222,9 @@ export const adminApi = {
     return { userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0 }
   }),
 
-  /** 全量问答记录分页 → Page<QaRecord> */
-  chatHistory: (page = 1, size = 10) =>
-    request.get('/admin/chat/history', { params: { page, size } }).catch(() => {
+  /** 全量问答记录分页 → Page<QaRecord>，支持关键字搜索 */
+  chatHistory: (page = 1, size = 10, keyword?: string) =>
+    request.get('/admin/chat/history', { params: { page, size, keyword } }).catch(() => {
       console.warn(`${MOCK_PREFIX} admin chatHistory fallback`)
       return { records: [], total: 0 }
     }),
@@ -229,9 +234,42 @@ export const adminApi = {
       throw new Error('后端未连接，无法查看详情')
     }),
 
+  /** 删除问答记录
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  deleteChat: (id: number) => request.delete(`/admin/chat/${id}`),
+
+  /** 我的会话列表（按会话查看） */
+  chatConversations: (keyword?: string) =>
+    request.get('/admin/chat/conversations', { params: { keyword } }).catch(() => {
+      console.warn(`${MOCK_PREFIX} chatConversations fallback`)
+      return []
+    }),
+
+  /** 某会话的所有消息 */
+  chatConversationMessages: (convId: number) =>
+    request.get(`/admin/chat/conversations/${convId}/messages`).catch(() => {
+      console.warn(`${MOCK_PREFIX} chatConversationMessages fallback convId=${convId}`)
+      return []
+    }),
+
+  /** 删除整个会话（含消息和问答记录） */
+  deleteConversation: (convId: number) =>
+    request.delete(`/admin/chat/conversations/${convId}`),
+
   /** 重建向量索引
    *  不设 mock 降级——写操作必须透传后端错误。 */
   rebuildIndex: () => request.post('/admin/rebuild-index'),
+}
+
+// ==================== 个人管理（Profile） ====================
+export const profileApi = {
+  /** 修改密码 */
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request.put('/user/password', { oldPassword, newPassword }),
+
+  /** 修改个人信息（邮箱） */
+  updateProfile: (email: string) =>
+    request.put('/user/profile', { email }),
 }
 
 export default request

@@ -134,10 +134,11 @@ public class ChatController {
 
     /** 我的会话列表 */
     @GetMapping("/conversations")
-    public Result<List<Conversation>> conversations(HttpServletRequest request) {
+    public Result<List<Conversation>> conversations(HttpServletRequest request,
+                                                     @RequestParam(required = false) String keyword) {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) return Result.success(List.of());
-        return Result.success(qaService.getConversations(userId));
+        return Result.success(qaService.getConversations(userId, keyword));
     }
 
     /** 某会话的消息列表 */

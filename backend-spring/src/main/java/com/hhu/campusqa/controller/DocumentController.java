@@ -103,10 +103,9 @@ public class DocumentController {
         }
     }
 
-    /** 删除文档（仅管理员） */
+    /** 删除文档 */
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable Long id, HttpServletRequest request) {
-        checkAdmin(request);
+    public Result<Void> delete(@PathVariable Long id) {
         kbDocumentService.deleteDocument(id);
         return Result.success();
     }
@@ -121,10 +120,9 @@ public class DocumentController {
         return Result.success(doc);
     }
 
-    /** 重新处理单个文档（仅管理员） */
+    /** 重新处理单个文档 */
     @PostMapping("/{id}/reprocess")
-    public Result<KbDocument> reprocess(@PathVariable Long id, HttpServletRequest request) {
-        checkAdmin(request);
+    public Result<KbDocument> reprocess(@PathVariable Long id) {
         KbDocument doc = kbDocumentService.getById(id);
         if (doc == null) {
             throw new BizException(404, "文档不存在");

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { Card, Col, Row, Statistic } from 'antd'
 import { CommentOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons'
 import { adminApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Dashboard() {
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
   const [stats, setStats] = useState({ userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0 })
 
   useEffect(() => {
@@ -44,16 +47,18 @@ export default function Dashboard() {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={6}>
-          <Card>
-            <Statistic
-              title="注册用户"
-              value={stats.userCount}
-              prefix={<UserOutlined />}
-              suffix="人"
-            />
-          </Card>
-        </Col>
+        {isAdmin && (
+          <Col xs={24} sm={6}>
+            <Card>
+              <Statistic
+                title="注册用户"
+                value={stats.userCount}
+                prefix={<UserOutlined />}
+                suffix="人"
+              />
+            </Card>
+          </Col>
+        )}
       </Row>
     </>
   )
