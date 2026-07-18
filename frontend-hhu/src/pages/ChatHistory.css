@@ -1,0 +1,48 @@
+/* ChatHistory — 磨砂玻璃质感 */
+
+/* 表格卡片容器 */
+.chat-history-table-wrap {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  padding: 16px 20px;
+}
+
+/* 标题区 */
+.chat-history-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Modal 玻璃化 */
+.chat-history-modal-mask {
+  background: rgba(10, 25, 41, 0.45) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.chat-history-modal .ant-modal-content {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  border-radius: 18px !important;
+}
+
+.chat-history-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.chat-history-modal .ant-modal-body {
+  background: transparent !important;
+}
+
+.chat-history-modal .ant-modal-footer {
+  background: transparent !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}

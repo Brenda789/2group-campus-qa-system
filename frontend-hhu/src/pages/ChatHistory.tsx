@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Table, Modal, Tag, message, Button, Popconfirm, Input, Space, Spin } from 'antd'
-import { SearchOutlined, UserOutlined, RobotOutlined, EditOutlined } from '@ant-design/icons'
+import { Table, Modal, Tag, message, Button, Popconfirm, Input, Spin } from 'antd'
+import { SearchOutlined, UserOutlined, RobotOutlined, EditOutlined, CommentOutlined } from '@ant-design/icons'
 import { adminApi } from '../api'
+import './ChatHistory.css'
 
 export default function ChatHistory() {
   const [data, setData] = useState<any[]>([])
@@ -149,43 +150,48 @@ export default function ChatHistory() {
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>问答记录</h2>
-      </Space>
-      <div style={{ marginBottom: 16 }}>
-        <Input.Search
-          placeholder="搜索会话标题关键字"
-          allowClear
-          onSearch={(value) => { setKeyword(value); load(1, value) }}
-          style={{ width: 360 }}
-          prefix={<SearchOutlined />}
+      <div className="chat-history-table-wrap">
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <CommentOutlined style={{ fontSize: 20, color: '#005BAC' }} />
+          <h2 className="chat-history-title">问答记录</h2>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <Input.Search
+            placeholder="搜索会话标题关键字"
+            allowClear
+            onSearch={(value) => { setKeyword(value); load(1, value) }}
+            style={{ width: 360 }}
+            prefix={<SearchOutlined />}
+          />
+        </div>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={{
+            current: page,
+            total,
+            pageSize,
+            showTotal: (t: number) => `共 ${t} 条`,
+            onChange: (p: number) => load(p),
+          }}
+          onRow={(record) => ({
+            style: { cursor: 'pointer' },
+            onClick: () => openDetail(record.id, record.title),
+          })}
         />
       </div>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={data}
-        loading={loading}
-        pagination={{
-          current: page,
-          total,
-          pageSize,
-          showTotal: (t: number) => `共 ${t} 条`,
-          onChange: (p: number) => load(p),
-        }}
-        onRow={(record) => ({
-          style: { cursor: 'pointer' },
-          onClick: () => openDetail(record.id, record.title),
-        })}
-      />
 
-      {/* 详情弹窗：展示会话内完整对话 */}
+      {/* 详情弹窗 */}
       <Modal
         title={`会话详情 · ${selectedConvTitle}`}
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
         width={680}
+        className="chat-history-modal"
+        maskClassName="chat-history-modal-mask"
       >
         {detailLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
@@ -240,9 +246,12 @@ export default function ChatHistory() {
                       padding: '10px 16px',
                       borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                       background: isUser
-                        ? 'linear-gradient(135deg, #005BAC, #0ea5e9)'
-                        : '#f3f4f6',
-                      color: isUser ? '#fff' : '#1f2937',
+                        ? 'linear-gradient(135deg, rgba(0,91,172,0.80), rgba(14,165,233,0.70))'
+                        : 'rgba(255,255,255,0.40)',
+                      backdropFilter: 'blur(16px) saturate(120%)',
+                      WebkitBackdropFilter: 'blur(16px) saturate(120%)',
+                      border: isUser ? '1px solid rgba(255,255,255,0.20)' : '1px solid rgba(255,255,255,0.30)',
+                      color: isUser ? '#fff' : '#1e293b',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
                       fontSize: 14,
@@ -278,6 +287,8 @@ export default function ChatHistory() {
         okText="保存"
         cancelText="取消"
         destroyOnClose
+        className="chat-history-modal"
+        maskClassName="chat-history-modal-mask"
       >
         <Input
           value={renameTitle}

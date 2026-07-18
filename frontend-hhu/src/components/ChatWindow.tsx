@@ -372,13 +372,18 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
         display: 'flex', flexDirection: 'column',
       } : {
         width: '100%', height: 'calc(100vh - 140px)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 24px rgba(10,25,41,0.12)',
         display: 'flex', flexDirection: 'column',
+        background: 'rgba(255,255,255,0.55)',
+        backdropFilter: 'blur(28px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(130%)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 18,
       }}
       styles={{ body: { padding: 0, flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 } }}
     >
       {/* 左侧：会话列表 */}
-      <div style={{ width: 200, minWidth: 200, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', background: '#fafafa' }}>
+      <div style={{ width: 200, minWidth: 200, borderRight: '1px solid rgba(255,255,255,0.15)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '0 0 0 18px' }}>
         <div style={{ padding: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} block onClick={newConversation} style={{ whiteSpace: 'nowrap' }}>新对话</Button>
           {!isLoggedIn && <div style={{ textAlign: 'center', color: '#bbb', fontSize: 11, marginTop: 6 }}>💡 登录后可永久保存</div>}
@@ -404,10 +409,10 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
       </div>
 
       {/* 右侧：对话区 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'rgba(255,255,255,0.25)', borderRadius: '0 18px 18px 0' }}>
         <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           {activeConvId === null && messages.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#999', marginTop: 60 }}>
+            <div style={{ textAlign: 'center', color: '#999', marginTop: 190 }}>
               <RobotOutlined style={{ fontSize: 48 }} />
               <p>你好！我是河海大学问答助手，有什么可以帮你？</p>
               <div style={{ marginTop: 12 }}>
@@ -432,11 +437,11 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
           {loading && <div style={{ color: '#999', textAlign: 'center' }}><RobotOutlined spin /> 思考中...</div>}
           <div ref={msgEnd} />
         </div>
-        <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 12px' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', padding: '8px 12px' }}>
           {loading ? (
             <div style={{ display: 'flex', gap: 8 }}>
               <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入你的问题..." disabled />
-              <Button type="primary" danger icon={<StopOutlined />} onClick={handleStop}>停止</Button>
+              <Button style={{ background: 'linear-gradient(135deg, #475569, #64748b)', border: 'none', color: '#fff', borderRadius: 8, fontWeight: 600 }} icon={<StopOutlined />} onClick={handleStop}>停止</Button>
             </div>
           ) : (
             <Input.Search value={input} onChange={(e) => setInput(e.target.value)} onSearch={send} enterButton={<SendOutlined />} placeholder="输入你的问题..." />

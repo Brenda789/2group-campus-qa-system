@@ -252,11 +252,11 @@ export default function DocumentManage() {
     <>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ marginBottom: 4, fontWeight: 700 }}>
-            <FileTextOutlined style={{ marginRight: 10, color: '#005BAC' }} />
-            知识库管理
-          </Title>
-          <Text type="secondary">管理文档切片，构建问答知识库</Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <FileTextOutlined style={{ fontSize: 20, color: '#005BAC' }} />
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.25)' }}>知识库管理</h2>
+          </div>
+          <Text type="secondary" style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>管理文档切片，构建问答知识库</Text>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button type="primary" icon={<UploadOutlined />} size="large"
@@ -299,7 +299,7 @@ export default function DocumentManage() {
           50% { opacity: 0.3; }
         }
       `}</style>
-      <Card style={{ borderRadius: 16, border: '1px solid #eef2f7' }}>
+      <Card style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px) saturate(130%)', WebkitBackdropFilter: 'blur(24px) saturate(130%)' }}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
           <InboxOutlined style={{ marginRight: 6 }} />
           支持 PDF / DOCX / TXT / MD 格式，单文件最大 10MB，支持多文件同时上传
@@ -326,6 +326,8 @@ export default function DocumentManage() {
         onCancel={() => setUploadOpen(false)}
         footer={null}
         destroyOnClose
+        className="doc-upload-modal"
+        maskClassName="doc-upload-modal-mask"
       >
         <p style={{ color: '#999', marginBottom: 16 }}>
           支持 PDF / DOCX / TXT / MD，最大 10MB，可同时上传多个文件

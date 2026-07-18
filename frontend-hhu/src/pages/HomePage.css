@@ -300,14 +300,14 @@
 
 /* ====== 四层卡片：从左上到右下堆叠，底色由浅到深 ====== */
 
-/* pos-0 — 最前，白底实心 */
+/* pos-0 — 最前，淡蓝微透 */
 .home-deck-card.card-pos-0 {
   transform: translate(0, 0);
   z-index: 4;
   pointer-events: auto;
-  background: #fff;
-  border-color: #e2e8f0;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  background: rgba(220, 235, 250, 0.92);
+  border-color: rgba(180, 205, 225, 0.50);
+  box-shadow: 0 6px 24px rgba(0,91,172,0.08);
 }
 .home-deck-card.card-pos-0 .home-ring-title { color: #1e293b; }
 .home-deck-card.card-pos-0 .home-ring-desc { color: #64748b; }

@@ -4,7 +4,7 @@ import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { profileApi, userApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
-const { Title, Text } = Typography
+const { Title } = Typography
 
 /** 个人管理页面：修改密码和邮箱 */
 export default function ProfilePage() {
@@ -54,31 +54,31 @@ export default function ProfilePage() {
   }
 
   return (
-    <Card style={{ borderRadius: 16, border: '1px solid #eef2f7', maxWidth: 600 }}>
-      <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+    <Card style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.25)', maxWidth: 600, marginLeft: 320, background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px) saturate(130%)', WebkitBackdropFilter: 'blur(24px) saturate(130%)' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <div>
-          <Title level={3} style={{ marginBottom: 4, fontWeight: 700 }}>
-            <UserOutlined style={{ marginRight: 10, color: '#005BAC' }} />
-            个人管理
-          </Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            当前用户：{user.username}
-            {userEmail && <Tag style={{ marginLeft: 8 }}>{userEmail}</Tag>}
-          </Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <UserOutlined style={{ fontSize: 20, color: '#005BAC' }} />
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>个人管理</h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 15, color: '#475569' }}>
+            <span>当前用户：<strong style={{ color: '#1e293b', fontSize: 16 }}>{user.username}</strong></span>
+            {userEmail && <Tag style={{ margin: 0, fontSize: 13, borderRadius: 10 }}>{userEmail}</Tag>}
+          </div>
         </div>
 
-        <Divider style={{ margin: '8px 0' }} />
+        <Divider style={{ margin: '4px 0' }} />
 
         {/* 修改密码 */}
         <div>
-          <Title level={5} style={{ fontWeight: 600 }}>
+          <Title level={5} style={{ fontWeight: 600, marginTop: 0, marginBottom: 4 }}>
             <LockOutlined style={{ marginRight: 8 }} />
             修改密码
           </Title>
           <Form
             form={pwForm}
             layout="vertical"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: 4 }}
           >
             <Form.Item
               name="oldPassword"
@@ -126,18 +126,18 @@ export default function ProfilePage() {
           </Form>
         </div>
 
-        <Divider style={{ margin: '8px 0' }} />
+        <Divider style={{ margin: '4px 0' }} />
 
         {/* 修改邮箱 */}
         <div>
-          <Title level={5} style={{ fontWeight: 600 }}>
+          <Title level={5} style={{ fontWeight: 600, marginTop: 0, marginBottom: 4 }}>
             <MailOutlined style={{ marginRight: 8 }} />
             修改邮箱
           </Title>
           <Form
             form={emailForm}
             layout="vertical"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: 4 }}
           >
             <Form.Item
               name="email"

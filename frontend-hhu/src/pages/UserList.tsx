@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Tag, Button, Input, Space, message, Popconfirm, Card, Typography, Modal, Form, Select, Switch } from 'antd'
-import { UserOutlined, CheckCircleOutlined, StopOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
+import { UserOutlined, TeamOutlined, CheckCircleOutlined, StopOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
 import { userApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -202,12 +202,12 @@ export default function UserList() {
   ]
 
   return (
-    <Card style={{ borderRadius: 16, border: '1px solid #eef2f7' }}>
+    <Card style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px) saturate(130%)', WebkitBackdropFilter: 'blur(24px) saturate(130%)' }}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
           <div>
             <Title level={3} style={{ marginBottom: 4, fontWeight: 700 }}>
-              <UserOutlined style={{ marginRight: 10, color: '#005BAC' }} />
+              <TeamOutlined style={{ marginRight: 10, color: '#005BAC' }} />
               用户列表
             </Title>
             <Text type="secondary" style={{ fontSize: 14 }}>支持按用户关键词搜索，并实时启停账号状态</Text>

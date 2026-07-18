@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Button, Dropdown, Avatar, Space, Tag, Alert } from 'antd'
 import {
-  DashboardOutlined, HomeOutlined, UserOutlined,
+  DashboardOutlined, HomeOutlined, UserOutlined, TeamOutlined,
   FileTextOutlined, LogoutOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, CommentOutlined, RobotOutlined,
 } from '@ant-design/icons'
@@ -37,7 +37,7 @@ export default function AdminLayout() {
     { key: '/admin/ai-assistant', icon: <RobotOutlined />, label: 'AI问答助手' },
     { key: '/admin/chat', icon: <CommentOutlined />, label: '问答记录' },
     { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
-    ...(isAdmin ? [{ key: '/admin/users', icon: <UserOutlined />, label: '用户管理' }] : []),
+    ...(isAdmin ? [{ key: '/admin/users', icon: <TeamOutlined />, label: '用户管理' }] : []),
     { key: '/admin/profile', icon: <UserOutlined />, label: '个人管理' },
   ]
 
@@ -46,7 +46,7 @@ export default function AdminLayout() {
       {/* ====== 建筑背景 ====== */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 0,
-        backgroundImage: `url('/images/campus/BG.png')`,
+        backgroundImage: `url('/images/campus/sea.jpg')`,
         backgroundSize: 'cover', backgroundPosition: 'center',
       }} />
       <div style={{
@@ -230,14 +230,30 @@ export default function AdminLayout() {
               alt="河海大学"
               style={{ height: 36, filter: 'brightness(0) invert(1)' }}
             />
-            <Button
-              type="text"
-              icon={<HomeOutlined />}
+            <button
               onClick={() => navigate('/')}
-              style={{ color: 'rgba(255,255,255,0.80)', fontWeight: 500, fontSize: 14 }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '7px 18px', borderRadius: 50,
+                border: 'none', background: 'transparent',
+                color: 'rgba(255,255,255,0.75)', fontWeight: 600, fontSize: 14,
+                cursor: 'pointer', outline: 'none',
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.18)'
+                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'rgba(255,255,255,0.75)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
             >
+              <HomeOutlined style={{ fontSize: 15 }} />
               返回首页
-            </Button>
+            </button>
           </div>
 
           {/* 右侧：用户信息 + 退出登录 */}
@@ -249,7 +265,10 @@ export default function AdminLayout() {
           >
             <div style={{
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-              padding: '4px 4px',
+              padding: '5px 14px', borderRadius: 20,
+              background: 'rgba(255,255,255,0.80)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               transition: 'opacity 0.2s',
             }}
               onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75' }}
@@ -268,15 +287,14 @@ export default function AdminLayout() {
                 <span style={{
                   fontWeight: 700,
                   fontSize: 13,
-                  color: isAdmin ? '#1e293b' : '#fff',
-                  textShadow: isAdmin ? '0 0 12px rgba(255,255,255,0.7)' : 'none',
+                  color: '#1e293b',
                 }}>
                   {user.username || '用户'}
                 </span>
                 <Tag style={{
                   borderRadius: 10, fontSize: 10, border: 'none',
-                  background: isAdmin ? 'rgba(217,119,70,0.18)' : 'rgba(255,255,255,0.10)',
-                  color: isAdmin ? '#d97746' : '#a5d8ff',
+                  background: '#e8f4ff',
+                  color: '#005BAC',
                   padding: '0 8px', fontWeight: 600,
                 }}>
                   {isAdmin ? '管理员' : '用户'}

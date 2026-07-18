@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Modal } from 'antd'
 import {
-  CommentOutlined, FileTextOutlined, UserOutlined,
+  CommentOutlined, FileTextOutlined, UserOutlined, TeamOutlined,
   RobotOutlined, UploadOutlined, ArrowRightOutlined, PlusOutlined,
 } from '@ant-design/icons'
 import { adminApi } from '../api'
@@ -187,7 +187,7 @@ export default function Dashboard() {
     { key: 'qa', label: '会话总数', value: stats.qaCount.toLocaleString(), icon: <CommentOutlined />, nav: '/admin/chat' },
     { key: 'today', label: '今日问答', value: stats.todayQaCount.toLocaleString(), icon: <RobotOutlined />, nav: '/admin/ai-assistant' },
     { key: 'docs', label: '知识库文档', value: stats.documentCount.toLocaleString(), icon: <FileTextOutlined />, nav: '/admin/documents' },
-    ...(isAdmin ? [{ key: 'users', label: '注册用户', value: stats.userCount.toLocaleString(), icon: <UserOutlined />, nav: '/admin/users' }] : []),
+    ...(isAdmin ? [{ key: 'users', label: '注册用户', value: stats.userCount.toLocaleString(), icon: <TeamOutlined />, nav: '/admin/users' }] : []),
   ]
 
   return (
