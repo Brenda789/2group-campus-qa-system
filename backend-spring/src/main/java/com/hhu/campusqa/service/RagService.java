@@ -73,10 +73,21 @@ public class RagService {
      * 同步问答（一次性返回完整答案）
      */
     public AnswerService.AnswerResult answer(String question) {
-        return answer(question, config.getTopK());
+        return answer(question, config.getTopK(), null);
+    }
+
+    /**
+     * 同步问答，带用户 ID（用于文档可见性过滤）
+     */
+    public AnswerService.AnswerResult answer(String question, Long userId) {
+        return answer(question, config.getTopK(), userId);
     }
 
     public AnswerService.AnswerResult answer(String question, int topK) {
+        return answer(question, topK, null);
+    }
+
+    private AnswerService.AnswerResult answer(String question, int topK, Long userId) {
         log.info("RAG 问答开始: question=\"{}\", topK={}",
                 truncate(question, 40), topK);
 
@@ -95,6 +106,33 @@ public class RagService {
 
         // 3. 向量检索
         List<ScoredChunk> retrieved = vectorStore.search(qVec, topK);
+        if (retrieved.isEmpty()) {
+            return new AnswerService.AnswerResult("未找到与您问题相关的知识库内容。", List.of());
+        }
+
+        // 3.1 文档可见性过滤：普通用户/访客只能看到 PUBLIC 文档 + 自己的文档
+        if (userId != null) {
+            retrieved = retrieved.stream().filter(chunk -> {
+                KbDocument doc = kbDocumentMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<KbDocument>()
+                                .eq(KbDocument::getTitle, chunk.getSource())
+                ).stream().findFirst().orElse(null);
+                if (doc == null) return true; // 查不到文档就保留
+                if ("PUBLIC".equals(doc.getVisibility())) return true;
+                return doc.getUploadedBy() != null && doc.getUploadedBy().equals(userId);
+            }).collect(Collectors.toList());
+        } else {
+            // 未登录访客只看到 PUBLIC
+            retrieved = retrieved.stream().filter(chunk -> {
+                KbDocument doc = kbDocumentMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<KbDocument>()
+                                .eq(KbDocument::getTitle, chunk.getSource())
+                ).stream().findFirst().orElse(null);
+                if (doc == null) return true;
+                return "PUBLIC".equals(doc.getVisibility());
+            }).collect(Collectors.toList());
+        }
+
         if (retrieved.isEmpty()) {
             return new AnswerService.AnswerResult("未找到与您问题相关的知识库内容。", List.of());
         }

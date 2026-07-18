@@ -12,6 +12,7 @@ import {
   InboxOutlined,
   LikeOutlined,
   DislikeOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import { chatApi, docApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
@@ -58,9 +59,9 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   const [hoveredConv, setHoveredConv] = useState<number | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<string>('')
-  const [uploadDocId, setUploadDocId] = useState<number | null>(null)
-  const uploadPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [uploadFiles, setUploadFiles] = useState<{ name: string; status: string; chunkCount?: number }[]>([])
+  const uploadPollRefs = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map())
+  const pollCounterRef = useRef(0)
   const msgEnd = useRef<HTMLDivElement>(null)
   const cancelStream = useRef<(() => void) | null>(null)
   const [renameVisible, setRenameVisible] = useState(false)
@@ -78,7 +79,8 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   useEffect(() => {
     return () => {
       cancelStream.current?.()
-      if (uploadPollRef.current) clearInterval(uploadPollRef.current)
+      uploadPollRefs.current.forEach((timer) => clearInterval(timer))
+      uploadPollRefs.current.clear()
     }
   }, [])
 
@@ -198,6 +200,25 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
     )
   }
 
+  // ==================== 停止生成 ====================
+  const handleStop = () => {
+    cancelStream.current?.()
+    cancelStream.current = null
+    setLoading(false)
+    setMessages((prev) => {
+      const updated = [...prev]
+      const lastIdx = updated.length - 1
+      if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
+        if (updated[lastIdx].content) {
+          updated[lastIdx] = { ...updated[lastIdx], content: updated[lastIdx].content + '\n\n[已停止生成]' }
+        } else {
+          updated[lastIdx] = { ...updated[lastIdx], content: '[已停止生成]' }
+        }
+      }
+      return updated
+    })
+  }
+
   const selectConversation = (convId: number) => {
     setActiveConvId(convId)
     if (isLoggedIn) loadMessagesFromApi(convId)
@@ -262,27 +283,59 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   }
 
   const clearUploadState = () => {
-    setUploading(false); setUploadDocId(null); setUploadStatus('')
-    if (uploadPollRef.current) { clearInterval(uploadPollRef.current); uploadPollRef.current = null }
+    setUploading(false); setUploadFiles([])
+    uploadPollRefs.current.forEach((timer) => clearInterval(timer))
+    uploadPollRefs.current.clear()
   }
 
   const handleUpload = async (info: any) => {
-    const file = info.file as File
-    setUploading(true); setUploadStatus('PROCESSING')
-    try {
-      const doc: any = await docApi.upload(file)
-      if (!doc?.id) { message.error('上传返回异常'); clearUploadState(); return }
-      setUploadDocId(doc.id)
-      uploadPollRef.current = setInterval(async () => {
-        try {
-          const latest: any = await docApi.getById(doc.id)
-          if (!latest) return
-          setUploadStatus(latest.status)
-          if (latest.status === 'READY') { clearUploadState(); setUploadOpen(false); message.success(`处理完成，共 ${latest.chunkCount ?? 0} 个切片`) }
-          else if (latest.status === 'ERROR') { clearUploadState(); message.error('文档处理失败，请检查文件格式') }
-        } catch { /* */ }
-      }, 500)
-    } catch (e: any) { message.error(e?.message || '上传失败'); clearUploadState() }
+    const files: File[] = info.fileList?.length > 0
+      ? info.fileList.map((f: any) => f.originFileObj || f).filter(Boolean)
+      : info.file ? [info.file] : []
+    if (files.length === 0) return
+    setUploading(true)
+    // 初始化文件列表
+    const initialFiles = files.map((f) => ({ name: f.name, status: 'PROCESSING' }))
+    setUploadFiles(initialFiles)
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      try {
+        const doc: any = await docApi.upload(file)
+        if (!doc?.id) {
+          setUploadFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: 'ERROR' } : f))
+          continue
+        }
+        // 启动轮询
+        const pollId = ++pollCounterRef.current
+        const timer = setInterval(async () => {
+          try {
+            const latest: any = await docApi.getById(doc.id)
+            if (!latest) return
+            setUploadFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: latest.status, chunkCount: latest.chunkCount } : f))
+            if (latest.status === 'READY' || latest.status === 'ERROR') {
+              const t = uploadPollRefs.current.get(pollId)
+              if (t) { clearInterval(t); uploadPollRefs.current.delete(pollId) }
+              // 检查是否全部完成
+              setUploadFiles((prev) => {
+                const allDone = prev.every((f) => f.status === 'READY' || f.status === 'ERROR')
+                if (allDone) {
+                  const okCount = prev.filter((f) => f.status === 'READY').length
+                  const failCount = prev.filter((f) => f.status === 'ERROR').length
+                  if (failCount === 0) message.success(`全部处理完成，共 ${okCount} 个文档`)
+                  else message.info(`处理完成：${okCount} 个成功${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+                  setTimeout(() => { setUploading(false); setUploadOpen(false); setUploadFiles([]) }, 2000)
+                }
+                return prev
+              })
+            }
+          } catch { /* */ }
+        }, 500)
+        uploadPollRefs.current.set(pollId, timer)
+      } catch {
+        setUploadFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: 'ERROR' } : f))
+      }
+    }
   }
 
   // ==================== 聊天窗口 UI ====================
@@ -372,7 +425,14 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
           <div ref={msgEnd} />
         </div>
         <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 12px' }}>
-          <Input.Search value={input} onChange={(e) => setInput(e.target.value)} onSearch={send} enterButton={<SendOutlined />} placeholder="输入你的问题..." loading={loading} />
+          {loading ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入你的问题..." disabled />
+              <Button type="primary" danger icon={<StopOutlined />} onClick={handleStop}>停止</Button>
+            </div>
+          ) : (
+            <Input.Search value={input} onChange={(e) => setInput(e.target.value)} onSearch={send} enterButton={<SendOutlined />} placeholder="输入你的问题..." />
+          )}
         </div>
       </div>
     </Card>
@@ -391,41 +451,59 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
       {chatOpen && chatCard}
 
       {/* 上传文档 Modal */}
-      <Modal title="上传文档到知识库" open={uploadOpen} onCancel={() => { clearUploadState(); setUploadOpen(false) }} footer={null} destroyOnClose zIndex={10000}>
-        <p style={{ color: '#999', marginBottom: 16 }}>支持 PDF / DOCX / TXT / MD，最大 10MB{!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}</p>
-        {!uploadStatus && (
-          <Upload.Dragger beforeUpload={() => false} onChange={handleUpload} showUploadList={false} accept=".pdf,.docx,.doc,.txt,.md" style={{ padding: '24px 0' }}>
+      <Modal title="上传文档到知识库" open={uploadOpen} onCancel={() => { clearUploadState(); setUploadOpen(false) }} footer={null} destroyOnClose zIndex={10000} width={560}>
+        <p style={{ color: '#999', marginBottom: 16 }}>支持 PDF / DOCX / TXT / MD，最大 10MB，可同时上传多个文件{!isLoggedIn && '。未登录上传的文档为临时文档，服务重启后清理'}</p>
+        {uploadFiles.length === 0 && (
+          <Upload.Dragger beforeUpload={() => false} onChange={handleUpload} showUploadList={false} accept=".pdf,.docx,.doc,.txt,.md" style={{ padding: '24px 0' }} multiple>
             <p className="ant-upload-drag-icon"><InboxOutlined style={{ fontSize: 40, color: '#005BAC' }} /></p>
-            <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>可将上传文件拖拽至此</p>
+            <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>可将上传文件拖拽至此（支持多文件）</p>
             <p className="ant-upload-hint" style={{ color: '#999' }}>或点击此处选择文件上传</p>
           </Upload.Dragger>
         )}
-        {uploadStatus && (
-          <div style={{ padding: '8px 0' }}>
-            {(['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING', 'READY', 'ERROR'] as const).map((key) => {
-              const label = STATUS_LABELS[key]
-              const statusOrder = ['PROCESSING', 'PARSING', 'SPLITTING', 'EMBEDDING', 'READY']
-              const currentIdx = statusOrder.indexOf(uploadStatus)
-              const stepIdx = statusOrder.indexOf(key)
-              const isActive = stepIdx <= currentIdx
-              const isCurrent = key === uploadStatus
-              if (key === 'ERROR') {
-                if (uploadStatus !== 'ERROR') return null
-                return <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', color: '#ff4d4f', fontWeight: 500 }}><span style={{ width: 22, height: 22, borderRadius: '50%', background: '#ff4d4f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✕</span><span>{STATUS_LABELS.ERROR}</span></div>
-              }
+        {uploadFiles.length > 0 && (
+          <div style={{ padding: '8px 0', maxHeight: 400, overflow: 'auto' }}>
+            {uploadFiles.map((f, idx) => {
+              const isDone = f.status === 'READY'
+              const isErr = f.status === 'ERROR'
+              const isProcessing = !isDone && !isErr
               return (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', color: isActive ? '#005BAC' : '#ccc', fontWeight: isCurrent ? 600 : 400, transition: 'color 0.3s' }}>
-                  {isCurrent ? <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#005BAC', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'pulse 1.2s ease-in-out infinite' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} /></span>
-                    : isActive ? <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#005BAC', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>
-                      : <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #ddd', background: '#fff' }} />}
-                  <span>{label}</span>
-                  {isCurrent && <Spin size="small" />}
+                <div key={idx} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px', marginBottom: 8,
+                  borderRadius: 10, border: '1px solid #f0f0f0',
+                  background: isDone ? '#f6ffed' : isErr ? '#fff2f0' : '#fafafa',
+                }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: isDone ? '#52c41a' : isErr ? '#ff4d4f' : '#005BAC',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, flexShrink: 0,
+                  }}>
+                    {isDone ? '✓' : isErr ? '✕' : <Spin size="small" style={{ color: '#fff' }} />}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                    <Tag color={isDone ? 'green' : isErr ? 'red' : isProcessing ? 'blue' : 'default'}
+                      style={{ fontSize: 11, marginTop: 2 }}>
+                      {STATUS_LABELS[f.status] || f.status}
+                      {isDone && f.chunkCount != null ? ` · ${f.chunkCount} 切片` : ''}
+                    </Tag>
+                  </div>
                 </div>
               )
             })}
+            {uploadFiles.some((f) => f.status !== 'READY' && f.status !== 'ERROR') && (
+              <p style={{ color: '#faad14', fontSize: 12, marginTop: 8, textAlign: 'center' }}>处理中，请勿关闭此窗口</p>
+            )}
+            {uploadFiles.every((f) => f.status === 'READY' || f.status === 'ERROR') && (
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <Button type="primary" onClick={() => { clearUploadState(); setUploadOpen(false) }}>
+                  关闭
+                </Button>
+              </div>
+            )}
           </div>
         )}
-        {uploadStatus && uploadStatus !== 'READY' && uploadStatus !== 'ERROR' && <p style={{ color: '#faad14', fontSize: 12, marginTop: 8, textAlign: 'center' }}>处理中，请勿关闭此窗口</p>}
       </Modal>
 
       {/* 重命名 Modal */}

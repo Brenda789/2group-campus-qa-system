@@ -211,6 +211,10 @@ export const docApi = {
   /** 重新处理单个文档 */
   reprocess: (id: number) => request.post(`/documents/${id}/reprocess`),
 
+  /** 修改文档可见性（管理员可用） */
+  setVisibility: (id: number, visibility: 'PUBLIC' | 'PRIVATE') =>
+    request.put(`/documents/${id}/visibility`, { visibility }),
+
   /** 查询单个文档（用于轮询处理状态） */
   getById: (id: number) =>
     request.get(`/documents/${id}`).catch(() => {

@@ -54,8 +54,15 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         if (status != null && !status.isBlank()) {
             qw.eq(KbDocument::getStatus, status);
         }
-        // 所有人只能看到自己上传的文档
-        qw.eq(KbDocument::getUploadedBy, userId != null ? userId : -1);
+        // 自己上传的文档 + 所有 PUBLIC 文档（公共文档所有人可见）
+        if (userId != null) {
+            qw.and(w -> w.eq(KbDocument::getUploadedBy, userId)
+                          .or()
+                          .eq(KbDocument::getVisibility, "PUBLIC"));
+        } else {
+            // 未登录访客只能看到 PUBLIC 文档
+            qw.eq(KbDocument::getVisibility, "PUBLIC");
+        }
         qw.orderByDesc(KbDocument::getCreateTime);
         try {
             return this.page(new Page<>(page, size), qw);
@@ -115,6 +122,8 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
         }
 
         boolean isTemporary = "guest".equals(userRole);
+        // 管理员上传为公共文档，普通用户/访客为私有
+        String visibility = "admin".equals(userRole) ? "PUBLIC" : "PRIVATE";
 
         KbDocument doc = KbDocument.builder()
                 .title(originalFilename)
@@ -124,7 +133,7 @@ public class KbDocumentService extends ServiceImpl<KbDocumentMapper, KbDocument>
                 .status("PROCESSING")
                 .uploadedBy(uploadedBy)
                 .isTemporary(isTemporary)
-                .visibility("PRIVATE")  // 默认私有
+                .visibility(visibility)
                 .build();
         save(doc);
 

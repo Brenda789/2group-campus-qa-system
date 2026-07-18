@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography, Modal } from 'antd'
 import { UploadOutlined, ReloadOutlined, SearchOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
-import { docApi, adminApi } from '../api'
+import { docApi, adminApi, userApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text } = Typography
 
@@ -34,6 +35,9 @@ const STATUS_OPTIONS = [
 ]
 
 export default function DocumentManage() {
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [data, setData] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -58,9 +62,14 @@ export default function DocumentManage() {
     }
   }, [keyword, statusFilter])
 
+  useEffect(() => { load() }, [load])
+
+  // 获取当前用户 ID（用于判断文档归属）
   useEffect(() => {
-    load()
-  }, [load])
+    userApi.me().then((info: any) => {
+      if (info?.id) setCurrentUserId(info.id)
+    }).catch(() => {})
+  }, [])
 
   // 有进行中文档时，每 500ms 自动刷新（确保捕捉到所有中间状态）
   useEffect(() => {
@@ -73,18 +82,25 @@ export default function DocumentManage() {
   }, [data, page, load])
 
   const handleUpload = async (info: any) => {
-    const file = info.file as File
+    const files: File[] = info.fileList?.length > 0
+      ? info.fileList.map((f: any) => f.originFileObj || f).filter(Boolean)
+      : info.file ? [info.file] : []
+    if (files.length === 0) return
     setUploading(true)
-    try {
-      await docApi.upload(file)
-      message.success('上传成功，正在处理')
-      setUploadOpen(false)
-      load(1)
-    } catch (e: any) {
-      message.error(e?.message || '上传失败')
-    } finally {
-      setUploading(false)
+    let okCount = 0; let failCount = 0
+    for (const file of files) {
+      try {
+        await docApi.upload(file)
+        okCount++
+      } catch {
+        failCount++
+      }
     }
+    setUploading(false)
+    setUploadOpen(false)
+    if (failCount === 0) message.success(`上传成功，共 ${okCount} 个文档，正在处理`)
+    else message.info(`上传完成：${okCount} 个成功${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+    load(1)
   }
 
   const handleDelete = async (id: number) => {
@@ -179,36 +195,56 @@ export default function DocumentManage() {
       title: '可见性',
       dataIndex: 'visibility',
       width: 100,
-      render: (v: string, record: any) => (
-        <Tag
-          color={v === 'PUBLIC' ? 'blue' : 'default'}
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleVisibility(record.id, v || 'PRIVATE')}
-        >
-          {v === 'PUBLIC' ? '公开' : '私有'}
-        </Tag>
-      ),
+      render: (v: string, record: any) => {
+        const isOwner = currentUserId != null && record.uploadedBy === currentUserId
+        // 只有管理员才能切换可见性，且只能操作自己的文档
+        const canToggle = isAdmin
+        return (
+          <Tag
+            color={v === 'PUBLIC' ? 'blue' : 'default'}
+            style={{ cursor: canToggle ? 'pointer' : 'default' }}
+            onClick={() => canToggle && handleVisibility(record.id, v || 'PRIVATE')}
+          >
+            {v === 'PUBLIC' ? '公开' : '私有'}
+          </Tag>
+        )
+      },
     },
     {
       title: '操作',
-      render: (_: any, record: any) => (
-        <Space size="small">
-          <Popconfirm
-            title="确定重新处理该文档？将重新切分和向量化。"
-            onConfirm={() => handleReprocess(record.id)}
-          >
-            <Button size="small">重新处理</Button>
-          </Popconfirm>
-          <Popconfirm
-            title="确定删除该文档？删除后不可恢复。"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button size="small" danger>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_: any, record: any) => {
+        const isOwner = currentUserId != null && record.uploadedBy === currentUserId
+        // 管理员可以操作所有文档，普通用户只能操作自己的文档
+        const canManage = isAdmin || isOwner
+        // 如果是公共文档且非管理员，不能删除和重新处理
+        const isPublicDoc = record.visibility === 'PUBLIC'
+        const canDelete = canManage && (!isPublicDoc || isAdmin)
+        const canReprocess = canManage && (!isPublicDoc || isAdmin)
+        return (
+          <Space size="small">
+            {canReprocess ? (
+              <Popconfirm
+                title="确定重新处理该文档？将重新切分和向量化。"
+                onConfirm={() => handleReprocess(record.id)}
+              >
+                <Button size="small">重新处理</Button>
+              </Popconfirm>
+            ) : (
+              <Button size="small" disabled title={isPublicDoc ? '公共文档请联系管理员处理' : '无权限'}>重新处理</Button>
+            )}
+            {canDelete ? (
+              <Popconfirm
+                title="确定删除该文档？删除后不可恢复。"
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button size="small" danger>删除</Button>
+              </Popconfirm>
+            ) : (
+              <Button size="small" danger disabled title={isPublicDoc ? '公共文档不可删除' : '无权限'}>删除</Button>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
@@ -229,13 +265,15 @@ export default function DocumentManage() {
           >
             上传文档
           </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            loading={rebuilding}
-            onClick={handleRebuild}
-          >
-            重建索引
-          </Button>
+          {isAdmin && (
+            <Button
+              icon={<ReloadOutlined />}
+              loading={rebuilding}
+              onClick={handleRebuild}
+            >
+              重建索引
+            </Button>
+          )}
         </div>
       </div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -264,7 +302,7 @@ export default function DocumentManage() {
       <Card style={{ borderRadius: 16, border: '1px solid #eef2f7' }}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
           <InboxOutlined style={{ marginRight: 6 }} />
-          支持 PDF / DOCX / TXT / MD 格式，单文件最大 10MB
+          支持 PDF / DOCX / TXT / MD 格式，单文件最大 10MB，支持多文件同时上传
         </Text>
         <Table
           rowKey="id"
@@ -290,7 +328,7 @@ export default function DocumentManage() {
         destroyOnClose
       >
         <p style={{ color: '#999', marginBottom: 16 }}>
-          支持 PDF / DOCX / TXT / MD，最大 10MB
+          支持 PDF / DOCX / TXT / MD，最大 10MB，可同时上传多个文件
         </p>
         <Upload.Dragger
           beforeUpload={() => false}
@@ -298,12 +336,13 @@ export default function DocumentManage() {
           showUploadList={false}
           accept=".pdf,.docx,.doc,.txt,.md"
           style={{ padding: '24px 0' }}
+          multiple
         >
           <p className="ant-upload-drag-icon">
             <InboxOutlined style={{ fontSize: 40, color: '#005BAC' }} />
           </p>
           <p className="ant-upload-text" style={{ fontSize: 15, fontWeight: 500 }}>
-            可将上传文件拖拽至此
+            可将上传文件拖拽至此（支持多文件）
           </p>
           <p className="ant-upload-hint" style={{ color: '#999' }}>
             或点击此处选择文件上传

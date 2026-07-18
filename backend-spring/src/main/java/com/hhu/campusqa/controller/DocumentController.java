@@ -103,9 +103,24 @@ public class DocumentController {
         }
     }
 
-    /** 删除文档 */
+    /** 删除文档（管理员可删任意文档，普通用户只能删自己的非公共文档） */
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable Long id) {
+    public Result<Void> delete(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        KbDocument doc = kbDocumentService.getById(id);
+        if (doc == null) {
+            throw new BizException(404, "文档不存在");
+        }
+        // 非管理员只能删除自己上传的非公共文档
+        if (!"admin".equals(role)) {
+            if (!doc.getUploadedBy().equals(userId)) {
+                throw new BizException(403, "只能删除自己上传的文档");
+            }
+            if ("PUBLIC".equals(doc.getVisibility())) {
+                throw new BizException(403, "公共文档不可删除，请联系管理员");
+            }
+        }
         kbDocumentService.deleteDocument(id);
         return Result.success();
     }
@@ -120,12 +135,18 @@ public class DocumentController {
         return Result.success(doc);
     }
 
-    /** 重新处理单个文档 */
+    /** 重新处理单个文档（管理员可处理任意文档，普通用户只能处理自己的文档） */
     @PostMapping("/{id}/reprocess")
-    public Result<KbDocument> reprocess(@PathVariable Long id) {
+    public Result<KbDocument> reprocess(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
         KbDocument doc = kbDocumentService.getById(id);
         if (doc == null) {
             throw new BizException(404, "文档不存在");
+        }
+        // 非管理员只能重新处理自己上传的文档
+        if (!"admin".equals(role) && !doc.getUploadedBy().equals(userId)) {
+            throw new BizException(403, "只能重新处理自己上传的文档");
         }
         kbDocumentService.reprocessDocument(doc);
         return Result.success(kbDocumentService.getById(id));
