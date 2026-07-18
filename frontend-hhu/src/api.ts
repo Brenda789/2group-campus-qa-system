@@ -127,7 +127,7 @@ export const chatApi = {
     onSources?: (sources: string[]) => void,
   ) => {
     const controller = new AbortController()
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     const baseUrl = 'http://localhost:8000/api'
 
     fetch(`${baseUrl}/chat/stream`, {
@@ -177,6 +177,16 @@ export const chatApi = {
             continue
           }
 
+          // 访客 token（匿名提问时后端自动创建）
+          if (data.startsWith('__TOKEN__')) {
+            const guestToken = data.slice(9)
+            if (guestToken && typeof window !== 'undefined') {
+              window.sessionStorage.setItem('token', guestToken)
+              window.sessionStorage.setItem('user', JSON.stringify({ username: '访客', role: 'guest' }))
+            }
+            continue
+          }
+
           full += data
           onToken(data)
         }
@@ -208,6 +218,13 @@ export const docApi = {
     fd.append('file', _file)
     return request.post('/documents', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((doc: any) => {
+      // 访客上传：后端返回 guestToken，前端自动存入 sessionStorage
+      if (doc?.guestToken && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('token', doc.guestToken)
+        window.sessionStorage.setItem('user', JSON.stringify({ username: '访客', role: 'guest' }))
+      }
+      return doc
     })
   },
 

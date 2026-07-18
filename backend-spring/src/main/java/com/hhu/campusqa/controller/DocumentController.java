@@ -79,6 +79,7 @@ public class DocumentController {
         // 用户身份检查：无 token 或用户已被清理时自动创建访客
         Long userId = (Long) request.getAttribute("userId");
         String role = (String) request.getAttribute("role");
+        String guestToken = null;
         if (userId != null) {
             try {
                 if (sysUserService.getById(userId) == null) userId = null;
@@ -88,6 +89,7 @@ public class DocumentController {
             java.util.Map<String, Object> guest = sysUserService.createGuestUser();
             userId = (Long) guest.get("userId");
             role = "guest";
+            guestToken = (String) guest.get("token");
         }
 
         try {
@@ -97,6 +99,7 @@ public class DocumentController {
                     userId,
                     role
             );
+            if (guestToken != null) doc.setGuestToken(guestToken);
             return Result.success(doc);
         } catch (IOException e) {
             throw new BizException(500, "文件读取失败");

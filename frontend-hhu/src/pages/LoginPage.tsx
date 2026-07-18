@@ -49,6 +49,9 @@ export default function LoginPage() {
   const isSwitchingRef = useRef(false)
   const [panelOpacity, setPanelOpacity] = useState(1)
 
+  // 记住我
+  const [rememberMe, setRememberMe] = useState(true)
+
   // 密码可见性
   const [loginPwdVisible, setLoginPwdVisible] = useState(false)
   const [regPwdVisible, setRegPwdVisible] = useState(false)
@@ -184,7 +187,7 @@ export default function LoginPage() {
     try {
       const encryptedPwd = encryptPassword(values.password)
       const data: any = await authApi.login(values.username, encryptedPwd)
-      login({ token: data.token, username: values.username, role: data.role || 'admin' })
+      login({ token: data.token, username: values.username, role: data.role || 'admin', remember: rememberMe })
       message.success('登录成功，正在进入管理后台')
       navigate('/admin')
     } catch (e: any) {
@@ -195,7 +198,7 @@ export default function LoginPage() {
         e?.code === 'ERR_NETWORK' ||
         e?.code === 'ERR_BAD_RESPONSE'
       if (isNetworkError) {
-        login({ token: 'dev-fallback-token', username: values.username, role: 'admin' })
+        login({ token: 'dev-fallback-token', username: values.username, role: 'admin', remember: rememberMe })
         message.warning('后端未连接，已进入离线演示模式')
         navigate('/admin')
         return
@@ -212,7 +215,7 @@ export default function LoginPage() {
       const encryptedPwd = encryptPassword(values.password)
       await authApi.register(values.username, encryptedPwd, values.email)
       const data: any = await authApi.login(values.username, encryptedPwd)
-      login({ token: data.token, username: values.username, role: data.role || 'user' })
+      login({ token: data.token, username: values.username, role: data.role || 'user', remember: rememberMe })
       message.success('注册成功，已为你自动登录')
       navigate('/admin')
     } catch (e: any) {
@@ -356,7 +359,7 @@ export default function LoginPage() {
                     {/* 附加选项 */}
                     <div className="login-extra-row">
                       <label className="login-checkbox-wrap">
-                        <input type="checkbox" className="login-checkbox" />
+                        <input type="checkbox" className="login-checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                         <span>记住我</span>
                       </label>
                       <span className="login-forgot-link" onClick={() => setForgotPwdVisible(true)}>
@@ -509,13 +512,13 @@ export default function LoginPage() {
         className="login-modal"
         maskClassName="login-modal-mask"
       >
-        <div style={{ padding: '12px 0', lineHeight: 2.3, fontSize: 14, color: 'rgba(255,255,255,0.80)' }}>
-          <p style={{ fontWeight: 600, marginBottom: 14, color: '#fff', fontSize: 15 }}>
+        <div style={{ padding: '14px 16px', lineHeight: 2.3, fontSize: 14, color: '#334155', background: 'rgba(240, 244, 249, 0.92)', borderRadius: 12, backdropFilter: 'blur(12px)', border: '1px solid rgba(200, 210, 225, 0.40)' }}>
+          <p style={{ fontWeight: 700, marginBottom: 14, color: '#1e293b', fontSize: 15 }}>
             请联系张老师重置密码
           </p>
           <p>联系电话：12345678912</p>
           <p>办公地址：A楼502</p>
-          <p style={{ color: 'rgba(255,255,255,0.45)', marginTop: 14, fontSize: 13 }}>
+          <p style={{ color: '#94a3b8', marginTop: 14, fontSize: 13 }}>
             请在工作日 8:00-11:00，14:00-17:00 进行联系
           </p>
         </div>

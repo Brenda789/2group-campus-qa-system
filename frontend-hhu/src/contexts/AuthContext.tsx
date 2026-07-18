@@ -12,7 +12,7 @@ interface AuthContextValue {
   role: 'admin' | 'user' | 'guest'
   isLoggedIn: boolean
   isGuest: boolean
-  login: (payload: { token?: string; username?: string; role?: 'admin' | 'user' | 'guest' }) => void
+  login: (payload: { token?: string; username?: string; role?: 'admin' | 'user' | 'guest'; remember?: boolean }) => void
   logout: () => void
 }
 
@@ -50,17 +50,24 @@ function readStoredAuth(): { token: string | null; user: AuthUser } {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<{ token: string | null; user: AuthUser }>(readStoredAuth)
 
-  const login = useCallback((payload: { token?: string; username?: string; role?: 'admin' | 'user' | 'guest' }) => {
+  const login = useCallback((payload: { token?: string; username?: string; role?: 'admin' | 'user' | 'guest'; remember?: boolean }) => {
     const nextUser: AuthUser = {
       username: payload.username || '用户',
       role: (payload.role === 'admin' ? 'admin' : payload.role === 'guest' ? 'guest' : 'user') as AuthUser['role'],
     }
     const nextToken = payload.token || ''
+    const usePersistent = payload.remember !== false // 默认记住（勾选或未传时走 localStorage）
     if (typeof window !== 'undefined') {
-      if (nextUser.role === 'guest') {
+      if (nextUser.role === 'guest' || !usePersistent) {
+        // 访客 / 未勾选记住我 → sessionStorage（关闭浏览器即清除）
         window.sessionStorage.setItem('token', nextToken)
         window.sessionStorage.setItem('user', JSON.stringify(nextUser))
+        if (!usePersistent) {
+          window.localStorage.removeItem('token')
+          window.localStorage.removeItem('user')
+        }
       } else {
+        // 勾选记住我 → localStorage（持久化）
         window.localStorage.setItem('token', nextToken)
         window.localStorage.setItem('user', JSON.stringify(nextUser))
         window.sessionStorage.removeItem('token')

@@ -76,7 +76,8 @@ export default function HomePage() {
   /* ---- 内联多轮对话 ---- */
   type QATurn = { question: string; answer: string; loading: boolean; sources: string[] }
   const [conversation, setConversation] = useState<QATurn[]>([])
-  const convIdRef = useRef<number | undefined>(undefined) // 当前会话 ID
+  const convIdRef = useRef<number | undefined>(undefined) // 当前会话 ID（登录用户）
+  const guestConvIdRef = useRef<number>(0) // 访客模式下的会话 ID（固定一条）
   const panelRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<(() => void) | null>(null)
 
@@ -116,6 +117,10 @@ export default function HomePage() {
           if (t) next[turnIndex] = { ...t, answer: fullAnswer, loading: false }
           return next
         })
+        // 访客模式：将本轮 Q&A 追加到固定的一条 guest 会话中
+        if (!isLoggedIn) {
+          chatRef.current?.addGuestConversation(guestConvIdRef.current, q, fullAnswer)
+        }
       },
       (err) => {
         cancelRef.current = null
@@ -153,6 +158,7 @@ export default function HomePage() {
     cancelRef.current?.()
     cancelRef.current = null
     convIdRef.current = undefined
+    guestConvIdRef.current = Date.now() // 访客：新 ID → ChatWindow 左侧新增一条
     setConversation([])
     setSearchText('')
   }

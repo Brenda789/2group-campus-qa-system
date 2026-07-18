@@ -50,4 +50,8 @@ public class KbDocument {
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    /** 访客上传时返回的 token（仅传输使用，不持久化） */
+    @TableField(exist = false)
+    private String guestToken;
 }

@@ -7,6 +7,8 @@ import com.hhu.campusqa.entity.Message;
 import com.hhu.campusqa.entity.QaRecord;
 import com.hhu.campusqa.service.QaService;
 import com.hhu.campusqa.service.RagService;
+import com.hhu.campusqa.service.SysUserService;
+import com.hhu.campusqa.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -34,10 +36,12 @@ public class ChatController {
 
     private final QaService qaService;
     private final RagService ragService;
+    private final SysUserService sysUserService;
 
-    public ChatController(QaService qaService, RagService ragService) {
+    public ChatController(QaService qaService, RagService ragService, SysUserService sysUserService) {
         this.qaService = qaService;
         this.ragService = ragService;
+        this.sysUserService = sysUserService;
     }
 
     /** 提问（RAG 引擎，一次性返回；支持匿名） */
@@ -80,10 +84,15 @@ public class ChatController {
             CountDownLatch latch = new CountDownLatch(1);
 
             if (userId == null) {
-                // 匿名：只推送答案，不存库
-                ragService.streamAnswer(req.getQuestion(), writer, result -> latch.countDown());
+                // 匿名：自动创建访客 → 拿到 userId + token → 发送给前端 → 权限过滤
+                Map<String, Object> guest = sysUserService.createGuestUser();
+                final Long guestId = (Long) guest.get("userId");
+                final String guestToken = (String) guest.get("token");
+                writer.write("data: __TOKEN__" + guestToken + "\n\n");
+                writer.flush();
+                ragService.streamAnswer(req.getQuestion(), writer, result -> latch.countDown(), guestId);
             } else {
-                // 登录用户：推送答案 + 完成后异步存库
+                // 登录用户：推送答案 + 权限过滤 + 完成后异步存库
                 final String question = req.getQuestion();
                 ragService.streamAnswer(req.getQuestion(), writer, result -> {
                     // 异步保存，不阻塞 SSE 流关闭
@@ -98,7 +107,7 @@ public class ChatController {
                         }
                     });
                     latch.countDown();
-                });
+                }, userId);
             }
 
             try {

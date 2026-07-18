@@ -164,6 +164,11 @@ public class RagService {
      * @param onComplete 流式完成回调，携带完整答案 + 来源列表（null 表示无需回调）
      */
     public void streamAnswer(String question, PrintWriter writer, Consumer<StreamResult> onComplete) {
+        streamAnswer(question, writer, onComplete, null);
+    }
+
+    /** 带用户 ID 的流式问答，根据文档可见性过滤切片 */
+    public void streamAnswer(String question, PrintWriter writer, Consumer<StreamResult> onComplete, Long userId) {
         try {
             // 1. 确保索引已构建
             ensureIndex();
@@ -196,13 +201,34 @@ public class RagService {
                 return;
             }
 
-            // 4. 提取来源
+            // 4. 权限过滤：仅保留该用户有权访问的文档切片
+            //    访客 → 仅 PUBLIC；登录用户 → PUBLIC + 自己上传的
+            {
+                final Long uid = userId;
+                java.util.Set<String> allowedTitles = kbDocumentMapper.selectList(null).stream()
+                        .filter(d -> "PUBLIC".equals(d.getVisibility())
+                                || (uid != null && uid.equals(d.getUploadedBy())))
+                        .map(KbDocument::getTitle)
+                        .collect(Collectors.toSet());
+                retrieved = retrieved.stream()
+                        .filter(c -> allowedTitles.contains(c.getSource()))
+                        .collect(Collectors.toList());
+                if (retrieved.isEmpty()) {
+                    writeSse(writer, "未找到相关知识库内容。");
+                    if (onComplete != null) {
+                        onComplete.accept(new StreamResult("未找到相关知识库内容。", List.of()));
+                    }
+                    return;
+                }
+            }
+
+            // 5. 提取来源
             List<String> sources = retrieved.stream()
                     .map(ScoredChunk::getSource)
                     .distinct()
                     .collect(Collectors.toList());
 
-            // 5. 构建 Prompt + 流式调用 LLM
+            // 6. 构建 Prompt + 流式调用 LLM
             String userMessage = buildUserMessage(question, retrieved);
             callLlmStream(userMessage, writer, sources, onComplete);
 

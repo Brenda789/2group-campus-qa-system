@@ -697,46 +697,48 @@
 }
 
 /* ============================================================
-   忘记密码 Modal 玻璃化
+   忘记密码 Modal — 浅灰玻璃
    ============================================================ */
 .login-modal-mask {
-  background: rgba(10, 25, 41, 0.60) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(10, 25, 41, 0.35) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .login-modal .ant-modal-content {
-  background: rgba(15, 39, 68, 0.85) !important;
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
-  border: 1px solid var(--white-15) !important;
+  background: rgba(240, 244, 249, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  border: 1px solid rgba(200, 210, 225, 0.40) !important;
   border-radius: 20px !important;
-  box-shadow:
-    0 24px 64px rgba(10, 25, 41, 0.40),
-    inset 0 1px 0 var(--white-08) !important;
+  box-shadow: 0 8px 32px rgba(10, 25, 41, 0.12);
 }
 
 .login-modal .ant-modal-header {
   background: transparent !important;
-  border-bottom: 1px solid var(--white-10) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
   border-radius: 20px 20px 0 0 !important;
 }
 
 .login-modal .ant-modal-title {
-  color: #fff !important;
-  font-weight: 600;
+  color: #1e293b !important;
+  font-weight: 700;
 }
 
 .login-modal .ant-modal-close {
-  color: var(--steel) !important;
+  color: #94a3b8 !important;
 }
 
 .login-modal .ant-modal-close:hover {
-  color: #fff !important;
+  color: #1e293b !important;
+}
+
+.login-modal .ant-modal-body {
+  background: transparent !important;
 }
 
 .login-modal .ant-modal-footer {
-  border-top: 1px solid var(--white-10) !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
 
 .login-modal .ant-btn-default {
