@@ -10,6 +10,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   CommentOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -37,12 +38,14 @@ export default function AdminLayout() {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users'
     if (location.pathname.startsWith('/admin/documents')) return '/admin/documents'
     if (location.pathname.startsWith('/admin/chat')) return '/admin/chat'
+    if (location.pathname.startsWith('/admin/ai-assistant')) return '/admin/ai-assistant'
     if (location.pathname.startsWith('/admin/profile')) return '/admin/profile'
     return '/admin'
   }
 
   const menuItems = [
     { key: '/admin', icon: <DashboardOutlined />, label: '仪表盘' },
+    { key: '/admin/ai-assistant', icon: <RobotOutlined />, label: 'AI问答助手' },
     { key: '/admin/chat', icon: <CommentOutlined />, label: '问答记录' },
     { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
     ...(role === 'admin'

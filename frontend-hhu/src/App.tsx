@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import UserList from './pages/UserList'
 import DocumentManage from './pages/DocumentManage'
 import ChatHistory from './pages/ChatHistory'
+import AIAssistant from './pages/AIAssistant'
 import ProfilePage from './pages/ProfilePage'
 import { useAuth, AuthProvider } from './contexts/AuthContext'
 
@@ -94,6 +95,7 @@ function AppRoutes() {
           <Route path="users" element={<UserList />} />
           <Route path="documents" element={<DocumentManage />} />
           <Route path="chat" element={<ChatHistory />} />
+          <Route path="ai-assistant" element={<AIAssistant />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to={isLoggedIn ? '/' : '/login'} replace />} />
