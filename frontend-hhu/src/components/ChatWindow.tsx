@@ -389,7 +389,7 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
     <Card
       title={
         <Space>
-          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #005BAC, #0ea5e9)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: '#fff' }}><RobotOutlined /></span>
+          <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><img src="/images/hema.png" alt="河海问答助手" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></span>
           <span style={{ fontWeight: 700, fontSize: 15 }}>河海问答助手</span>
           {!isLoggedIn && <Tag style={{ borderRadius: 10, fontSize: 10, border: '1px solid #fbbf24', background: '#fef3c7', color: '#92400e' }}>访客模式 · 刷新后记录消失</Tag>}
         </Space>
@@ -451,7 +451,7 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
         <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           {activeConvId === null && messages.length === 0 && (
             <div style={{ textAlign: 'center', color: '#999', marginTop: 190 }}>
-              <RobotOutlined style={{ fontSize: 48 }} />
+              <img src="/images/hema.png" alt="河海问答助手" style={{ width: 48, height: 48 }} />
               <p>你好！我是河海大学问答助手，有什么可以帮你？</p>
               <div style={{ marginTop: 12 }}>
                 {QUICK_QUESTIONS.map((q) => <Tag key={q} color="blue" style={{ cursor: 'pointer', marginBottom: 8 }} onClick={() => send(q)}>{q}</Tag>)}
@@ -497,7 +497,7 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
           style={{ position: 'fixed', right: 28, bottom: 28, width: 60, height: 60, border: 'none', borderRadius: 18, background: 'linear-gradient(135deg, #005BAC 0%, #0ea5e9 100%)', color: '#fff', fontSize: 28, cursor: 'pointer', boxShadow: '0 8px 28px rgba(0,91,172,0.40)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.3s ease, box-shadow 0.3s ease' }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,91,172,0.50)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,91,172,0.40)' }}
-        ><RobotOutlined /></button>
+        ><img src="/images/hema.png" alt="河海问答助手" style={{ width: 32, height: 32 }} /></button>
       )}
       {chatOpen && chatCard}
 

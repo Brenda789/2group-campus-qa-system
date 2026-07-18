@@ -4,7 +4,7 @@ import { message } from 'antd'
 import {
   UploadOutlined, SafetyOutlined, SendOutlined,
   BookOutlined, TrophyOutlined, TeamOutlined, EnvironmentOutlined,
-  CaretUpOutlined, CaretDownOutlined, RobotOutlined,
+  CaretUpOutlined, CaretDownOutlined,
   LoadingOutlined, StopOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
@@ -418,10 +418,6 @@ export default function HomePage() {
       {/* ===== 底部渐变条 — 自下向上渐隐 ===== */}
       <div className="home-bottom-bar" />
 
-      {/* ===== 右下角机器人悬浮窗 — 白底蓝标 ===== */}
-      <button className="home-fab" onClick={() => chatRef.current?.openChat()} aria-label="智能问答助手">
-        <RobotOutlined />
-      </button>
 
       {/* ===== 浮动聊天窗口 ===== */}
       <ChatWindow ref={chatRef} mode="floating" />

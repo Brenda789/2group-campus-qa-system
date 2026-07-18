@@ -4,7 +4,7 @@ import { Button, Dropdown, Avatar, Space, Tag, Alert } from 'antd'
 import {
   DashboardOutlined, HomeOutlined, UserOutlined, TeamOutlined,
   FileTextOutlined, LogoutOutlined, MenuFoldOutlined,
-  MenuUnfoldOutlined, CommentOutlined, RobotOutlined,
+  MenuUnfoldOutlined, CommentOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -34,7 +34,7 @@ export default function AdminLayout() {
 
   const navItems = [
     { key: '/admin', icon: <DashboardOutlined />, label: '仪表盘' },
-    { key: '/admin/ai-assistant', icon: <RobotOutlined />, label: 'AI问答助手' },
+    { key: '/admin/ai-assistant', icon: <img src="/images/hema.png" alt="河海问答助手" style={{ width: 16, height: 16 }} />, label: 'AI问答助手' },
     { key: '/admin/chat', icon: <CommentOutlined />, label: '问答记录' },
     { key: '/admin/documents', icon: <FileTextOutlined />, label: '知识库管理' },
     ...(isAdmin ? [{ key: '/admin/users', icon: <TeamOutlined />, label: '用户管理' }] : []),

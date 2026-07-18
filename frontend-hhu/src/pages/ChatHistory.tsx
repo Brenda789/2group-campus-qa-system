@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Modal, Tag, message, Button, Popconfirm, Input, Spin } from 'antd'
-import { SearchOutlined, UserOutlined, RobotOutlined, EditOutlined, CommentOutlined } from '@ant-design/icons'
+import { SearchOutlined, UserOutlined, EditOutlined, CommentOutlined } from '@ant-design/icons'
 import { adminApi } from '../api'
 import './ChatHistory.css'
 
@@ -228,7 +228,7 @@ export default function ChatHistory() {
                     fontSize: 16,
                     flexShrink: 0,
                   }}>
-                    {isUser ? <UserOutlined /> : <RobotOutlined />}
+                    {isUser ? <UserOutlined /> : <img src="/images/hema.png" alt="河海问答助手" style={{ width: 18, height: 18 }} />}
                   </div>
 
                   {/* 消息内容 */}

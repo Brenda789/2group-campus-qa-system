@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Modal } from 'antd'
 import {
   CommentOutlined, FileTextOutlined, UserOutlined, TeamOutlined,
-  RobotOutlined, UploadOutlined, ArrowRightOutlined, PlusOutlined,
+  UploadOutlined, ArrowRightOutlined, PlusOutlined,
 } from '@ant-design/icons'
 import { adminApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
@@ -185,7 +185,7 @@ export default function Dashboard() {
 
   const bentoCards = [
     { key: 'qa', label: '会话总数', value: stats.qaCount.toLocaleString(), icon: <CommentOutlined />, nav: '/admin/chat' },
-    { key: 'today', label: '今日问答', value: stats.todayQaCount.toLocaleString(), icon: <RobotOutlined />, nav: '/admin/ai-assistant' },
+    { key: 'today', label: '今日问答', value: stats.todayQaCount.toLocaleString(), icon: <img src="/images/hema.png" alt="河海问答助手" style={{ width: 24, height: 24 }} />, nav: '/admin/ai-assistant' },
     { key: 'docs', label: '知识库文档', value: stats.documentCount.toLocaleString(), icon: <FileTextOutlined />, nav: '/admin/documents' },
     ...(isAdmin ? [{ key: 'users', label: '注册用户', value: stats.userCount.toLocaleString(), icon: <TeamOutlined />, nav: '/admin/users' }] : []),
   ]
@@ -310,7 +310,7 @@ export default function Dashboard() {
           <h3 className="dash-panel-title"><span className="dash-dot orange" />快捷操作</h3>
           <div className="dash-quick-actions">
             <button className="dash-action-btn" onClick={() => navigate('/admin/ai-assistant')}>
-              <span className="dash-action-icon"><RobotOutlined /></span>打开 AI 问答助手</button>
+              <span className="dash-action-icon"><img src="/images/hema.png" alt="河海问答助手" style={{ width: 20, height: 20 }} /></span>打开 AI 问答助手</button>
             <button className="dash-action-btn orange" onClick={() => navigate('/admin/documents')}>
               <span className="dash-action-icon"><UploadOutlined /></span>管理知识库文档</button>
             <button className="dash-action-btn" onClick={() => navigate('/admin/chat')}>
