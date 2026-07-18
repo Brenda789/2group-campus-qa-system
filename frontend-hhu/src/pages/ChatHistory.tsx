@@ -1,23 +1,32 @@
 import { useState, useEffect } from 'react'
 import { Table, Modal, Tag, message, Button, Popconfirm, Input, Space, Spin } from 'antd'
-import { SearchOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons'
+import { SearchOutlined, UserOutlined, RobotOutlined, EditOutlined } from '@ant-design/icons'
 import { adminApi } from '../api'
 
 export default function ChatHistory() {
   const [data, setData] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const pageSize = 10
   const [loading, setLoading] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [detailMessages, setDetailMessages] = useState<any[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [selectedConvTitle, setSelectedConvTitle] = useState('')
+  const [renameVisible, setRenameVisible] = useState(false)
+  const [renameConvId, setRenameConvId] = useState<number | null>(null)
+  const [renameTitle, setRenameTitle] = useState('')
+  const [renameLoading, setRenameLoading] = useState(false)
 
-  const load = async (kw?: string) => {
+  const load = async (p = 1, kw?: string) => {
     const searchKey = kw ?? keyword
     setLoading(true)
     try {
-      const list: any = await adminApi.chatConversations(searchKey || undefined)
-      setData(list || [])
+      const res: any = await adminApi.chatConversations(p, pageSize, searchKey || undefined)
+      setData(res.records || [])
+      setTotal(res.total || 0)
+      setPage(p)
     } catch {
       message.error('加载问答记录失败')
     } finally {
@@ -49,9 +58,37 @@ export default function ChatHistory() {
     try {
       await adminApi.deleteConversation(convId)
       message.success('已删除')
-      load()
+      load(page)
     } catch (e: any) {
       message.error(e?.message || '删除失败')
+    }
+  }
+
+  const openRename = (convId: number, title: string) => {
+    setRenameConvId(convId)
+    setRenameTitle(title)
+    setRenameVisible(true)
+  }
+
+  const handleRename = async () => {
+    if (!renameConvId || !renameTitle.trim()) {
+      message.error('标题不能为空')
+      return
+    }
+    if (renameTitle.length > 100) {
+      message.error('标题不能超过100个字符')
+      return
+    }
+    setRenameLoading(true)
+    try {
+      await adminApi.renameConversation(renameConvId, renameTitle.trim())
+      message.success('已重命名')
+      setRenameVisible(false)
+      load(page)
+    } catch (e: any) {
+      message.error(e?.message || '重命名失败')
+    } finally {
+      setRenameLoading(false)
     }
   }
 
@@ -61,15 +98,27 @@ export default function ChatHistory() {
       title: '标题',
       dataIndex: 'title',
       ellipsis: true,
-      render: (t: string) => (
-        <span>{t && t.length > 40 ? t.substring(0, 40) + '...' : t}</span>
+      width: 250,
+      render: (t: string, record: any) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <span>{t && t.length > 40 ? t.substring(0, 40) + '...' : t}</span>
+          <EditOutlined
+            onClick={() => openRename(record.id, t)}
+            style={{
+              marginLeft: 8, fontSize: 12, color: '#999',
+              cursor: 'pointer', transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#005BAC'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#999'}
+          />
+        </span>
       ),
     },
     {
-      title: '消息数',
+      title: '问题数',
       width: 80,
       render: (_: any, record: any) => (
-        <Tag color="blue">{record.messageCount ?? '—'}</Tag>
+        <Tag color="blue">{record.questionCount ?? '—'}</Tag>
       ),
     },
     {
@@ -107,7 +156,7 @@ export default function ChatHistory() {
         <Input.Search
           placeholder="搜索会话标题关键字"
           allowClear
-          onSearch={(value) => { setKeyword(value); load(value) }}
+          onSearch={(value) => { setKeyword(value); load(1, value) }}
           style={{ width: 360 }}
           prefix={<SearchOutlined />}
         />
@@ -117,7 +166,13 @@ export default function ChatHistory() {
         columns={columns}
         dataSource={data}
         loading={loading}
-        pagination={false}
+        pagination={{
+          current: page,
+          total,
+          pageSize,
+          showTotal: (t: number) => `共 ${t} 条`,
+          onChange: (p: number) => load(p),
+        }}
         onRow={(record) => ({
           style: { cursor: 'pointer' },
           onClick: () => openDetail(record.id, record.title),
@@ -211,6 +266,28 @@ export default function ChatHistory() {
             })}
           </div>
         )}
+      </Modal>
+
+      {/* 重命名 Modal */}
+      <Modal
+        title="重命名会话"
+        open={renameVisible}
+        onCancel={() => setRenameVisible(false)}
+        onOk={handleRename}
+        confirmLoading={renameLoading}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Input
+          value={renameTitle}
+          onChange={(e) => setRenameTitle(e.target.value)}
+          placeholder="请输入新标题"
+          maxLength={100}
+          showCount
+          style={{ marginTop: 16 }}
+          onPressEnter={handleRename}
+        />
       </Modal>
     </>
   )

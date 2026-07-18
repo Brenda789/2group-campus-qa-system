@@ -154,6 +154,13 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .build();
         messageMapper.insert(aiMsg);
 
+        // 6. 更新会话的 updateTime（用于按最后活动时间排序）
+        Conversation conv = conversationMapper.selectById(conversationId);
+        if (conv != null) {
+            conv.setUpdateTime(java.time.LocalDateTime.now());
+            conversationMapper.updateById(conv);
+        }
+
         return record;
     }
 
@@ -218,10 +225,44 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
                 .build();
         messageMapper.insert(aiMsg);
 
+        // 更新会话的 updateTime
+        Conversation conv = conversationMapper.selectById(conversationId);
+        if (conv != null) {
+            conv.setUpdateTime(java.time.LocalDateTime.now());
+            conversationMapper.updateById(conv);
+        }
+
         return conversationId;
     }
 
     // ==================== Conversation（会话） ====================
+
+    /** 重命名会话（仅所属用户可操作） */
+    public void renameConversation(Long conversationId, Long userId, String newTitle) {
+        if (newTitle == null || newTitle.isBlank()) {
+            throw new BizException(400, "标题不能为空");
+        }
+        if (newTitle.length() > 100) {
+            throw new BizException(400, "标题不能超过100个字符");
+        }
+        Conversation conv = conversationMapper.selectById(conversationId);
+        if (conv == null || !conv.getUserId().equals(userId)) {
+            throw new BizException(403, "无权操作该会话");
+        }
+        conv.setTitle(newTitle);
+        conv.setUpdateTime(java.time.LocalDateTime.now());
+        conversationMapper.updateById(conv);
+    }
+
+    /** 创建新会话，返回会话 ID */
+    public Long createConversation(Long userId, String question) {
+        Conversation conv = Conversation.builder()
+                .userId(userId)
+                .title(question.length() > 30 ? question.substring(0, 30) + "..." : question)
+                .build();
+        conversationMapper.insert(conv);
+        return conv.getId();
+    }
 
     /** 查询某用户的会话列表（支持按标题关键字模糊搜索） */
     public List<Conversation> getConversations(Long userId, String keyword) {
@@ -231,7 +272,40 @@ public class QaService extends ServiceImpl<QaRecordMapper, QaRecord> {
             qw.like(Conversation::getTitle, keyword);
         }
         qw.orderByDesc(Conversation::getUpdateTime);
-        return conversationMapper.selectList(qw);
+        List<Conversation> list = conversationMapper.selectList(qw);
+        fillConversationCounts(list);
+        return list;
+    }
+
+    /** 分页查询某用户的会话列表（含消息数 + 问题数统计），用于问答记录管理 */
+    public Page<Conversation> pageConversations(Long userId, int page, int size, String keyword) {
+        LambdaQueryWrapper<Conversation> qw = new LambdaQueryWrapper<>();
+        qw.eq(Conversation::getUserId, userId);
+        if (StringUtils.hasText(keyword)) {
+            qw.like(Conversation::getTitle, keyword);
+        }
+        qw.orderByDesc(Conversation::getUpdateTime);
+        Page<Conversation> result = conversationMapper.selectPage(new Page<>(page, size), qw);
+        fillConversationCounts(result.getRecords());
+        return result;
+    }
+
+    /** 为会话列表填充 messageCount 和 questionCount */
+    private void fillConversationCounts(List<Conversation> conversations) {
+        if (conversations == null || conversations.isEmpty()) return;
+        for (Conversation conv : conversations) {
+            // 总消息数
+            Long totalMsgs = messageMapper.selectCount(
+                    new LambdaQueryWrapper<Message>()
+                            .eq(Message::getConversationId, conv.getId()));
+            // 问题数（role = 'user'）
+            Long userMsgs = messageMapper.selectCount(
+                    new LambdaQueryWrapper<Message>()
+                            .eq(Message::getConversationId, conv.getId())
+                            .eq(Message::getRole, "user"));
+            conv.setMessageCount(totalMsgs.intValue());
+            conv.setQuestionCount(userMsgs.intValue());
+        }
     }
 
     /** 删除会话及其所有消息和关联的问答记录 */

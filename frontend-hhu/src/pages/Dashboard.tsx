@@ -22,7 +22,7 @@ export default function Dashboard() {
         <Col xs={24} sm={6}>
           <Card>
             <Statistic
-              title="问答总数"
+              title="会话总数"
               value={stats.qaCount}
               prefix={<CommentOutlined />}
             />

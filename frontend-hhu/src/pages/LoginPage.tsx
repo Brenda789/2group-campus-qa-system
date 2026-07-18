@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Form, Input, Button, message, Tabs, Typography, Space, Checkbox } from 'antd'
+import { Card, Form, Input, Button, message, Tabs, Typography, Space, Checkbox, Modal } from 'antd'
 import { UserOutlined, LockOutlined, MailOutlined, SafetyOutlined } from '@ant-design/icons'
 import { authApi } from '../api'
 import JSEncrypt from 'jsencrypt'
@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const publicKeyRef = useRef<string | null>(null)
+  const [forgotPwdVisible, setForgotPwdVisible] = useState(false)
 
   // 页面加载时获取 RSA 公钥
   useEffect(() => {
@@ -190,7 +191,7 @@ export default function LoginPage() {
                   <Form.Item>
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Checkbox>记住我</Checkbox>
-                      <Text type="secondary">首次使用可直接注册</Text>
+                      <a onClick={() => setForgotPwdVisible(true)} style={{ fontSize: 13 }}>忘记密码？</a>
                     </Space>
                   </Form.Item>
                   <Form.Item>
@@ -237,6 +238,28 @@ export default function LoginPage() {
           ]} />
         </Space>
       </Card>
+
+      {/* 忘记密码 Modal */}
+      <Modal
+        title="忘记密码"
+        open={forgotPwdVisible}
+        onCancel={() => setForgotPwdVisible(false)}
+        footer={[
+          <Button key="ok" type="primary" onClick={() => setForgotPwdVisible(false)}>
+            我知道了
+          </Button>,
+        ]}
+        destroyOnClose
+      >
+        <div style={{ padding: '16px 0', lineHeight: 2.2, fontSize: 14 }}>
+          <p style={{ fontWeight: 600, marginBottom: 12 }}>请联系张老师重置密码</p>
+          <p>联系电话：12345678912</p>
+          <p>办公地址：A楼502</p>
+          <p style={{ color: '#999', marginTop: 12, fontSize: 13 }}>
+            请在工作日 8:00-11:00，14:00-17:00 进行联系
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -105,6 +105,11 @@ export const chatApi = {
   deleteConversation: (convId: number) =>
     request.delete(`/chat/conversations/${convId}`),
 
+  /** 重命名会话
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  renameConversation: (convId: number, title: string) =>
+    request.put(`/chat/conversations/${convId}/rename`, { title }),
+
   /**
    * 流式提问（SSE 打字机效果）
    *
@@ -238,11 +243,11 @@ export const adminApi = {
    *  不设 mock 降级——写操作必须透传后端错误。 */
   deleteChat: (id: number) => request.delete(`/admin/chat/${id}`),
 
-  /** 我的会话列表（按会话查看） */
-  chatConversations: (keyword?: string) =>
-    request.get('/admin/chat/conversations', { params: { keyword } }).catch(() => {
+  /** 我的会话列表分页（按会话查看） */
+  chatConversations: (page = 1, size = 10, keyword?: string) =>
+    request.get('/admin/chat/conversations', { params: { page, size, keyword } }).catch(() => {
       console.warn(`${MOCK_PREFIX} chatConversations fallback`)
-      return []
+      return { records: [], total: 0 }
     }),
 
   /** 某会话的所有消息 */
@@ -251,6 +256,11 @@ export const adminApi = {
       console.warn(`${MOCK_PREFIX} chatConversationMessages fallback convId=${convId}`)
       return []
     }),
+
+  /** 重命名会话
+   *  不设 mock 降级——写操作必须透传后端错误。 */
+  renameConversation: (convId: number, title: string) =>
+    request.put(`/admin/chat/conversations/${convId}/rename`, { title }),
 
   /** 删除整个会话（含消息和问答记录） */
   deleteConversation: (convId: number) =>

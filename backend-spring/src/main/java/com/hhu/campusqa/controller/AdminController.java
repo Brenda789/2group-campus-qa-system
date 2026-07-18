@@ -57,10 +57,8 @@ public class AdminController {
                 .eq(KbDocument::getUploadedBy, userId != null ? userId : -1)
                 .count();
 
-        // 自己的问答总数
-        long qaCount = qaService.lambdaQuery()
-                .eq(QaRecord::getUserId, userId)
-                .count();
+        // 自己的会话总数
+        long qaCount = qaService.getConversations(userId, null).size();
 
         // 自己的今日问答数
         LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
@@ -110,10 +108,12 @@ public class AdminController {
 
     /** 我的会话列表（分页，用于问答记录管理） */
     @GetMapping("/chat/conversations")
-    public Result<List<Conversation>> chatConversations(@RequestParam(required = false) String keyword,
+    public Result<Page<Conversation>> chatConversations(@RequestParam(defaultValue = "1") int page,
+                                                         @RequestParam(defaultValue = "10") int size,
+                                                         @RequestParam(required = false) String keyword,
                                                          HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        return Result.success(qaService.getConversations(userId, keyword));
+        return Result.success(qaService.pageConversations(userId, page, size, keyword));
     }
 
     /** 某会话的所有消息（用于查看完整对话） */
@@ -137,6 +137,17 @@ public class AdminController {
                                             HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         qaService.deleteConversation(id, userId);
+        return Result.success();
+    }
+
+    /** 重命名会话 */
+    @PutMapping("/chat/conversations/{id}/rename")
+    public Result<Void> renameConversation(@PathVariable Long id,
+                                           @RequestBody Map<String, String> body,
+                                           HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String title = body.get("title");
+        qaService.renameConversation(id, userId, title);
         return Result.success();
     }
 

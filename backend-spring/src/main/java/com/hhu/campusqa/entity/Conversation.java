@@ -35,4 +35,12 @@ public class Conversation {
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime updateTime;
+
+    /** 消息总数（不存库，查询时动态填充） */
+    @TableField(exist = false)
+    private Integer messageCount;
+
+    /** 问题数（user 消息数，不存库，查询时动态填充） */
+    @TableField(exist = false)
+    private Integer questionCount;
 }

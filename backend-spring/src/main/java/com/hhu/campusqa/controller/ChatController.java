@@ -54,20 +54,26 @@ public class ChatController {
                                  HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
 
+        // 登录用户：如果没有 conversationId，先创建会话，确保前端拿到真实 ID
+        final Long[] convIdHolder = new Long[1];
+        if (userId != null) {
+            if (req.getConversationId() != null) {
+                convIdHolder[0] = req.getConversationId();
+            } else {
+                // 预先创建新会话，这样前端能立刻拿到 convId
+                Long newConvId = qaService.createConversation(userId, req.getQuestion());
+                convIdHolder[0] = newConvId;
+                log.info("流式问答自动创建会话: convId={}", newConvId);
+            }
+        }
+
         StreamingResponseBody body = outputStream -> {
             PrintWriter writer = new PrintWriter(
                     new OutputStreamWriter(outputStream, StandardCharsets.UTF_8), true);
 
-            // 登录用户：先创建会话，发送 convId 给前端
-            final Long[] convIdHolder = new Long[1];
+            // 发送 convId 给前端
             if (userId != null) {
-                // 使用前端传来的 conversationId，否则创建新会话
-                if (req.getConversationId() != null) {
-                    convIdHolder[0] = req.getConversationId();
-                }
-                // 新会话由 saveStreamQa 自动创建，这里先发送占位
-                writer.write("data: __CONV__" +
-                        (convIdHolder[0] != null ? convIdHolder[0] : "new") + "\n\n");
+                writer.write("data: __CONV__" + convIdHolder[0] + "\n\n");
                 writer.flush();
             }
 
@@ -153,6 +159,17 @@ public class ChatController {
                                             HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         qaService.deleteConversation(id, userId);
+        return Result.success();
+    }
+
+    /** 重命名会话 */
+    @PutMapping("/conversations/{id}/rename")
+    public Result<Void> renameConversation(@PathVariable Long id,
+                                           @RequestBody Map<String, String> body,
+                                           HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String title = body.get("title");
+        qaService.renameConversation(id, userId, title);
         return Result.success();
     }
 }

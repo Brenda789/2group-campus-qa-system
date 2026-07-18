@@ -6,6 +6,7 @@ import {
   SendOutlined,
   CloseOutlined,
   DeleteOutlined,
+  EditOutlined,
   PlusOutlined,
   MessageOutlined,
   UploadOutlined,
@@ -72,6 +73,10 @@ export default function HomePage() {
   const uploadPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msgEnd = useRef<HTMLDivElement>(null)
   const cancelStream = useRef<(() => void) | null>(null)
+  const [renameVisible, setRenameVisible] = useState(false)
+  const [renameConvId, setRenameConvId] = useState<number | null>(null)
+  const [renameTitle, setRenameTitle] = useState('')
+  const [renameLoading, setRenameLoading] = useState(false)
 
   // 组件卸载时取消进行中的流式请求 + 清理上传轮询
   useEffect(() => {
@@ -244,6 +249,34 @@ export default function HomePage() {
   const newConversation = () => {
     setActiveConvId(null)
     setMessages([])
+  }
+
+  const openRename = (convId: number, title: string) => {
+    setRenameConvId(convId)
+    setRenameTitle(title)
+    setRenameVisible(true)
+  }
+
+  const handleRename = async () => {
+    if (!renameConvId || !renameTitle.trim()) {
+      message.error('标题不能为空')
+      return
+    }
+    if (renameTitle.length > 100) {
+      message.error('标题不能超过100个字符')
+      return
+    }
+    setRenameLoading(true)
+    try {
+      await chatApi.renameConversation(renameConvId, renameTitle.trim())
+      message.success('已重命名')
+      setRenameVisible(false)
+      loadConversations()
+    } catch (e: any) {
+      message.error(e?.message || '重命名失败')
+    } finally {
+      setRenameLoading(false)
+    }
   }
 
   const deleteConversation = async (convId: number) => {
@@ -693,6 +726,19 @@ export default function HomePage() {
                     <MessageOutlined style={{ marginRight: 6, fontSize: 12, color: '#999' }} />
                     {conv.title}
                   </span>
+                  <EditOutlined
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openRename(conv.id, conv.title)
+                    }}
+                    style={{
+                      fontSize: 12,
+                      color: hoveredConv === conv.id ? '#005BAC' : 'transparent',
+                      cursor: 'pointer',
+                      marginRight: 6,
+                      transition: 'color 0.15s',
+                    }}
+                  />
                   <DeleteOutlined
                     onClick={(e) => {
                       e.stopPropagation()
@@ -817,6 +863,7 @@ export default function HomePage() {
         onCancel={() => { clearUploadState(); setUploadOpen(false) }}
         footer={null}
         destroyOnClose
+        zIndex={10000}
       >
         <p style={{ color: '#999', marginBottom: 16 }}>
           支持 PDF / DOCX / TXT / MD，最大 10MB
@@ -924,6 +971,28 @@ export default function HomePage() {
             处理中，请勿关闭此窗口
           </p>
         )}
+      </Modal>
+
+      {/* 重命名会话 Modal */}
+      <Modal
+        title="重命名会话"
+        open={renameVisible}
+        onCancel={() => setRenameVisible(false)}
+        onOk={handleRename}
+        confirmLoading={renameLoading}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Input
+          value={renameTitle}
+          onChange={(e) => setRenameTitle(e.target.value)}
+          placeholder="请输入新标题"
+          maxLength={100}
+          showCount
+          style={{ marginTop: 16 }}
+          onPressEnter={handleRename}
+        />
       </Modal>
     </div>
   )
