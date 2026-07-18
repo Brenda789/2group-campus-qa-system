@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Table, Tag, Button, message, Upload, Popconfirm, Input, Select, Space, Card, Typography, Modal } from 'antd'
 import { UploadOutlined, ReloadOutlined, SearchOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { docApi, adminApi, userApi } from '../api'
@@ -45,6 +45,7 @@ export default function DocumentManage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
+  const uploadingRef = useRef(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
 
@@ -82,10 +83,14 @@ export default function DocumentManage() {
   }, [data, page, load])
 
   const handleUpload = async (info: any) => {
-    const files: File[] = info.fileList?.length > 0
-      ? info.fileList.map((f: any) => f.originFileObj || f).filter(Boolean)
-      : info.file ? [info.file] : []
+    if (uploadingRef.current) return
+    if (!info?.fileList || info.fileList.length === 0) return
+    const files: File[] = info.fileList
+      .filter((f: any) => f.status !== 'error') // 只取首次触发，跳过第二次
+      .map((f: any) => f.originFileObj || f)
+      .filter(Boolean)
     if (files.length === 0) return
+    uploadingRef.current = true
     setUploading(true)
     let okCount = 0; let failCount = 0
     for (const file of files) {
@@ -96,6 +101,7 @@ export default function DocumentManage() {
         failCount++
       }
     }
+    uploadingRef.current = false
     setUploading(false)
     setUploadOpen(false)
     if (failCount === 0) message.success(`上传成功，共 ${okCount} 个文档，正在处理`)

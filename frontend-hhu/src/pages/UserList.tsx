@@ -133,7 +133,7 @@ export default function UserList() {
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '用户名', dataIndex: 'username' },
-    { title: '邮箱', dataIndex: 'email', ellipsis: true },
+    { title: '邮箱', dataIndex: 'email', ellipsis: true, width: 160 },
     {
       title: '角色',
       dataIndex: 'role',
@@ -154,6 +154,7 @@ export default function UserList() {
             onConfirm={() => handleToggle(record.id, status === 1 ? 0 : 1, record)}
             okText="确定"
             cancelText="取消"
+            getPopupContainer={() => document.body}
           >
             <Switch
               checked={status === 1}
@@ -176,7 +177,7 @@ export default function UserList() {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 260,
       render: (_: any, record: any) => (
         <Space size="small">
           {isAdmin && (
@@ -185,12 +186,12 @@ export default function UserList() {
                 编辑
               </Button>
               {record.username !== currentUsername && (
-                <Popconfirm title="确定重置该用户密码为 admin123？" onConfirm={() => handleResetPassword(record.id)} okText="确定" cancelText="取消">
+                <Popconfirm title="确定重置该用户密码为 admin123？" onConfirm={() => handleResetPassword(record.id)} okText="确定" cancelText="取消" getPopupContainer={() => document.body}>
                   <Button type="link" size="small">重置密码</Button>
                 </Popconfirm>
               )}
               {record.username !== currentUsername && (
-                <Popconfirm title="确定删除该用户？此操作不可恢复" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
+                <Popconfirm title="确定删除该用户？此操作不可恢复" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消" getPopupContainer={() => document.body}>
                   <Button type="link" size="small" danger>删除</Button>
                 </Popconfirm>
               )}

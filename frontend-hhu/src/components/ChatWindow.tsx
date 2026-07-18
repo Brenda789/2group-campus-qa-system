@@ -46,6 +46,8 @@ export interface ChatWindowHandle {
   openUpload: () => void
   openChat: () => void
   sendQuestion: (q: string) => void
+  /** 访客模式下，HomePage 搜索框完成一轮问答后调用，追加到指定 guest 会话 */
+  addGuestConversation: (convId: number, q: string, answer: string) => void
 }
 
 const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded' }>(function ChatWindow({ mode = 'floating' }, ref) {
@@ -64,6 +66,7 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   const [uploadFiles, setUploadFiles] = useState<{ name: string; status: string; chunkCount?: number }[]>([])
   const uploadPollRefs = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map())
   const pollCounterRef = useRef(0)
+  const uploadingRef = useRef(false)
   const msgEnd = useRef<HTMLDivElement>(null)
   const cancelStream = useRef<(() => void) | null>(null)
   const [renameVisible, setRenameVisible] = useState(false)
@@ -71,15 +74,47 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   const [renameTitle, setRenameTitle] = useState('')
   const [renameLoading, setRenameLoading] = useState(false)
 
-  // 暴露 openUpload 给父组件
+  const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
+  const [guestNextId, setGuestNextId] = useState(1)
+
+  const guestConvsRef = useRef(guestConvs)
+  guestConvsRef.current = guestConvs
+  const guestNextIdRef = useRef(guestNextId)
+  guestNextIdRef.current = guestNextId
+  const chatOpenRef = useRef(chatOpen)
+  chatOpenRef.current = chatOpen
+
+  // 暴露给父组件
   useImperativeHandle(ref, () => ({
     openUpload: () => setUploadOpen(true),
     openChat: () => setChatOpen(true),
     sendQuestion: (q: string) => { setChatOpen(true); setTimeout(() => sendRef.current?.(q), 200); },
+    /** 访客模式下由 HomePage 搜索框调用，将完成的 Q&A 追加到指定 guest 会话 */
+    addGuestConversation: (convId: number, q: string, answer: string) => {
+      const existing = guestConvsRef.current[convId] || []
+      const newConvs = {
+        ...guestConvsRef.current,
+        [convId]: [
+          ...existing,
+          { role: 'user' as const, content: q },
+          { role: 'assistant' as const, content: answer },
+        ],
+      }
+      setGuestConvs(newConvs)
+      if (existing.length === 0) setGuestNextId(n => Math.max(n, convId + 1))
+      // 如果聊天窗口当前打开，刷新左侧列表
+      if (chatOpenRef.current) {
+        const list: ConvItem[] = Object.entries(newConvs).map(([id, msgs]) => {
+          const firstUser = msgs.find(m => m.role === 'user')
+          return {
+            id: Number(id),
+            title: firstUser ? (firstUser.content.length > 30 ? firstUser.content.substring(0, 30) + '...' : firstUser.content) : '新会话',
+          }
+        })
+        setConversations(list)
+      }
+    },
   }), [])
-
-  const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
-  const [guestNextId, setGuestNextId] = useState(1)
 
   // 清理
   useEffect(() => {
@@ -291,16 +326,19 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   }
 
   const clearUploadState = () => {
+    uploadingRef.current = false
     setUploading(false); setUploadFiles([])
     uploadPollRefs.current.forEach((timer) => clearInterval(timer))
     uploadPollRefs.current.clear()
   }
 
   const handleUpload = async (info: any) => {
+    if (uploadingRef.current) return
     const files: File[] = info.fileList?.length > 0
       ? info.fileList.map((f: any) => f.originFileObj || f).filter(Boolean)
       : info.file ? [info.file] : []
     if (files.length === 0) return
+    uploadingRef.current = true
     setUploading(true)
     // 初始化文件列表
     const initialFiles = files.map((f) => ({ name: f.name, status: 'PROCESSING' }))
@@ -332,7 +370,7 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
                   const failCount = prev.filter((f) => f.status === 'ERROR').length
                   if (failCount === 0) message.success(`全部处理完成，共 ${okCount} 个文档`)
                   else message.info(`处理完成：${okCount} 个成功${failCount > 0 ? `，${failCount} 个失败` : ''}`)
-                  setTimeout(() => { setUploading(false); setUploadOpen(false); setUploadFiles([]) }, 2000)
+                  setTimeout(() => { uploadingRef.current = false; setUploading(false); setUploadOpen(false); setUploadFiles([]) }, 2000)
                 }
                 return prev
               })
