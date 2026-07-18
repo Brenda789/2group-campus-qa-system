@@ -34,7 +34,7 @@ public class RagService {
     private static final String SYSTEM_PROMPT = """
             你是河海大学校园问答助手。请仅根据以下提供的参考文档回答问题。
             如果参考文档中没有相关信息，请如实说"该问题暂时无法从知识库中找到答案"。
-            回答时请引用来源文档标题。回答应简洁准确，控制在 200 字以内。""";
+            回答应简洁准确，控制在 200 字以内。不要在回答正文中提及来源或文件名。""";
 
     private final KbDocumentMapper kbDocumentMapper;
     private final DocumentParserService parserService;
@@ -240,10 +240,8 @@ public class RagService {
             try {
                 // 解析文档
                 String text = parserService.parse(doc.getFilePath(), doc.getFileType());
-                String taggedText = "[来源：" + doc.getTitle() + "]\n" + text;
-
-                // 切片
-                List<TextChunk> chunks = splitterService.split(taggedText);
+                // 切片（不再给文本加 [来源] 前缀，LLM 不需要看到文件名）
+                List<TextChunk> chunks = splitterService.split(text);
                 for (TextChunk chunk : chunks) {
                     chunk.setSource(doc.getTitle());
                 }
@@ -361,13 +359,12 @@ public class RagService {
         doc.setStatus("PARSING");
         kbDocumentMapper.updateById(doc);
         String text = parserService.parse(doc.getFilePath(), doc.getFileType());
-        String taggedText = "[来源：" + doc.getTitle() + "]\n" + text;
         holdStatus(); // 确保前端能观察到"解析中"状态
 
-        // 2. 文本切片
+        // 2. 文本切片（不标注来源文件名）
         doc.setStatus("SPLITTING");
         kbDocumentMapper.updateById(doc);
-        List<TextChunk> chunks = splitterService.split(taggedText);
+        List<TextChunk> chunks = splitterService.split(text);
         for (TextChunk chunk : chunks) {
             chunk.setSource(doc.getTitle());
         }
@@ -438,7 +435,7 @@ public class RagService {
         StringBuilder ctx = new StringBuilder();
         int charCount = 0;
         for (ScoredChunk chunk : retrieved) {
-            String block = "[来源：" + chunk.getSource() + "]\n" + chunk.getText() + "\n\n";
+            String block = chunk.getText() + "\n\n";
             if (charCount + block.length() > config.getMaxContextChars()) break;
             ctx.append(block);
             charCount += block.length();
@@ -560,12 +557,25 @@ public class RagService {
                     .doOnError(e -> {
                         log.error("LLM 流式调用失败: {}", e.toString());
                         writeSse(writer, "\n\n[AI 服务中断，请稍后重试]");
+                        try {
+                            String srcJson = objectMapper.writeValueAsString(sources);
+                            writeSse(writer, "__SRC__" + srcJson);
+                        } catch (Exception ex) {
+                            log.warn("未能发送来源标记", ex);
+                        }
                         if (onComplete != null) {
                             onComplete.accept(new StreamResult(fullAnswer.toString(), sources));
                         }
                     })
                     .doOnComplete(() -> {
                         log.info("流式问答完成: answer=\"{}\"", truncate(fullAnswer.toString(), 50));
+                        // 在流结束前发送来源文档
+                        try {
+                            String srcJson = objectMapper.writeValueAsString(sources);
+                            writeSse(writer, "__SRC__" + srcJson);
+                        } catch (Exception e) {
+                            log.warn("未能发送来源标记", e);
+                        }
                         if (onComplete != null) {
                             onComplete.accept(new StreamResult(fullAnswer.toString(), sources));
                         }

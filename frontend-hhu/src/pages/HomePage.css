@@ -1,0 +1,934 @@
+/* ============================================================
+   HomePage — 与 LoginPage 统一的液态玻璃设计系统
+   颜色体系：hhu-primary / navy / steel / white 递进透明度
+   ============================================================ */
+
+/* ---------- 共享 CSS Custom Properties ---------- */
+:root {
+  --hhu-primary: #005BAC;
+  --hhu-primary-dark: #004a8f;
+  --hhu-primary-light: #0ea5e9;
+  --hhu-glow: rgba(0, 91, 172, 0.35);
+  --hhu-ghost: rgba(0, 91, 172, 0.12);
+  --navy-deep: #0a1929;
+  --navy: #0f2744;
+  --steel: #94a3b8;
+}
+
+/* ============================================================
+   Page Wrapper
+   ============================================================ */
+.home-page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--navy-deep, #0a1929);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   Background Carousel（与 LoginPage 共享）
+   ============================================================ */
+.home-bg-carousel {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.home-bg-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.home-bg-slide.active {
+  opacity: 1;
+}
+
+.home-bg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: rgba(10, 25, 41, 0.55);
+  pointer-events: none;
+}
+
+/* ============================================================
+   Top Navigation Bar — 自上向下渐隐
+   ============================================================ */
+.home-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 40px;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 12, 24, 0.90) 0%,
+    rgba(10, 25, 41, 0.55) 50%,
+    rgba(10, 25, 41, 0) 100%
+  );
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* --- 左侧 Logo --- */
+.home-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-nav-logo {
+  height: 38px;
+  width: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 91, 172, 0.35));
+}
+
+/* ============================================================
+   Bottom Bar — 自下向上渐隐（与顶部镜像对称）
+   ============================================================ */
+.home-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: 80px;
+  background: linear-gradient(
+    0deg,
+    rgba(5, 12, 24, 0.90) 0%,
+    rgba(10, 25, 41, 0.55) 50%,
+    rgba(10, 25, 41, 0) 100%
+  );
+  pointer-events: none;
+}
+
+/* --- 中间导航 --- */
+.home-nav-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.home-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 50px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.80);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  outline: none;
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-nav-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.25);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(10, 25, 41, 0.25);
+}
+
+.home-nav-btn:active {
+  transform: translateY(0);
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-nav-btn-icon {
+  font-size: 15px;
+}
+
+/* --- 右侧按钮组 --- */
+.home-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-nav-user {
+  color: rgba(255,255,255,0.60);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* solid 强调按钮（登录/管理后台） */
+.home-nav-btn-solid {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 50px;
+  border: none;
+  background: linear-gradient(135deg, #004a8f, #005BAC);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  outline: none;
+  box-shadow: 0 4px 16px rgba(0, 91, 172, 0.30);
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-nav-btn-solid:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #005BAC, #0ea5e9);
+  color: #fff;
+  box-shadow: 0 6px 22px rgba(0, 91, 172, 0.45);
+}
+
+.home-nav-btn-solid:active {
+  transform: translateY(0);
+}
+
+/* logout 按钮 */
+.home-nav-btn-outline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 50px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  outline: none;
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-nav-btn-outline:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.home-nav-btn-outline:active {
+  transform: translateY(0);
+}
+
+/* ============================================================
+   Main Content Area — 三栏布局
+   ============================================================ */
+.home-main {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  max-width: 1300px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 12px 60px 16px 20px;
+  gap: 40px;
+  overflow: hidden;
+}
+
+/* ============================================================
+   Left — 叠放卡片组（对角堆叠 + 抽牌动画）
+   ============================================================ */
+.home-left {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: fadeSlideUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+/* 卡片视窗 */
+.home-deck-viewport {
+  position: relative;
+  width: 100%;
+  height: 370px;
+  overflow: hidden;
+}
+
+/* 单张卡片基底 — 宽一些、短一些 */
+.home-deck-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 50px;
+  bottom: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 20px;
+  padding: 22px 18px;
+  border: 2px solid rgba(200, 210, 220, 0.6);
+  transition:
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* ====== 四层卡片：从左上到右下堆叠，底色由浅到深 ====== */
+
+/* pos-0 — 最前，白底实心 */
+.home-deck-card.card-pos-0 {
+  transform: translate(0, 0);
+  z-index: 4;
+  pointer-events: auto;
+  background: #fff;
+  border-color: #e2e8f0;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+}
+.home-deck-card.card-pos-0 .home-ring-title { color: #1e293b; }
+.home-deck-card.card-pos-0 .home-ring-desc { color: #64748b; }
+
+/* pos-1 — 第二层，浅灰底，偏移 12px */
+.home-deck-card.card-pos-1 {
+  transform: translate(12px, 12px);
+  opacity: 0.85;
+  z-index: 3;
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.home-deck-card.card-pos-1 .home-ring-title { color: #334155; }
+.home-deck-card.card-pos-1 .home-ring-desc { color: #94a3b8; }
+
+/* pos-2 — 第三层，中灰底，偏移 24px */
+.home-deck-card.card-pos-2 {
+  transform: translate(24px, 24px);
+  opacity: 0.65;
+  z-index: 2;
+  background: #cbd5e1;
+  border-color: #94a3b8;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+.home-deck-card.card-pos-2 .home-ring-title { color: #475569; }
+.home-deck-card.card-pos-2 .home-ring-desc { color: #94a3b8; }
+
+/* pos-3 — 最底层，深灰底，偏移 36px */
+.home-deck-card.card-pos-3 {
+  transform: translate(36px, 36px);
+  opacity: 0.45;
+  z-index: 1;
+  background: #94a3b8;
+  border-color: #64748b;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.home-deck-card.card-pos-3 .home-ring-title { color: #1e293b; }
+.home-deck-card.card-pos-3 .home-ring-desc { color: #64748b; }
+
+/* ---- 移动端 ---- */
+@media (max-width: 1100px) {
+  .home-deck-viewport { height: 320px; }
+  .home-deck-card { right: 36px; bottom: 36px; }
+  .home-deck-card.card-pos-1 { transform: translate(9px, 9px); }
+  .home-deck-card.card-pos-2 { transform: translate(18px, 18px); }
+  .home-deck-card.card-pos-3 { transform: translate(27px, 27px); }
+}
+
+@media (max-width: 600px) {
+  .home-deck-viewport { height: 280px; }
+  .home-deck-card { right: 28px; bottom: 28px; }
+  .home-deck-card.card-pos-1 { transform: translate(7px, 7px); }
+  .home-deck-card.card-pos-2 { transform: translate(14px, 14px); }
+  .home-deck-card.card-pos-3 { transform: translate(21px, 21px); }
+}
+
+.home-ring-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 18px rgba(0, 91, 172, 0.25);
+}
+
+.home-ring-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.home-ring-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 切换按钮 */
+.home-ring-arrow {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.65);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-ring-arrow:hover {
+  background: rgba(255,255,255,0.16);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.home-ring-arrow:active {
+  transform: scale(0.95);
+}
+
+/* ============================================================
+   Center — 搜索区 + 对话面板
+   ============================================================ */
+.home-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  gap: 14px;
+  text-align: center;
+  min-height: 0;
+}
+
+/* 有对话时面板自动填充，搜索框沉底 */
+.home-center.has-conv {
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 0 20px;
+}
+
+.home-center-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  margin: 0;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.home-center-sub {
+  font-size: 15px;
+  color: rgba(255,255,255,0.45);
+  margin: 0 0 8px;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.home-search-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 620px;
+  background: rgba(255,255,255,0.24);
+  backdrop-filter: blur(56px) saturate(240%);
+  -webkit-backdrop-filter: blur(56px) saturate(240%);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 50px;
+  box-shadow:
+    0 4px 16px rgba(0,0,0,0.12),
+    0 12px 40px rgba(10,25,41,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+  transition:
+    border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.home-search-wrap:focus-within {
+  border-color: rgba(0, 91, 172, 0.60);
+  box-shadow:
+    0 0 0 4px rgba(0, 91, 172, 0.10),
+    0 12px 40px rgba(10,25,41,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.home-search-input {
+  flex: 1;
+  height: 52px;
+  padding: 0 24px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+}
+
+.home-search-input::placeholder {
+  color: rgba(255,255,255,0.30);
+}
+
+.home-search-btn {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  margin: 2px 2px 2px 0;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #004a8f, #005BAC);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  box-shadow: 0 4px 14px rgba(0, 91, 172, 0.30);
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-search-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 22px rgba(0, 91, 172, 0.45);
+  filter: brightness(1.1);
+}
+
+.home-search-btn:active {
+  transform: scale(0.96);
+}
+
+/* 中止按钮 — 灰蓝色 */
+.home-search-btn.stop {
+  background: linear-gradient(135deg, #475569, #64748b);
+  box-shadow:
+    0 4px 14px rgba(71, 85, 105, 0.35),
+    0 8px 24px rgba(71, 85, 105, 0.20);
+}
+
+.home-search-btn.stop:hover {
+  filter: brightness(1.10);
+  box-shadow:
+    0 6px 20px rgba(71, 85, 105, 0.45),
+    0 10px 30px rgba(71, 85, 105, 0.28);
+}
+
+/* ---- 快捷问题按钮 ---- */
+.home-quick-questions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+  animation: fadeSlideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both;
+}
+
+.home-quick-btn {
+  padding: 8px 18px;
+  border-radius: 50px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(42px) saturate(220%);
+  -webkit-backdrop-filter: blur(42px) saturate(220%);
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-quick-btn:hover {
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(0, 91, 172, 0.65);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.home-quick-btn:active {
+  transform: translateY(0);
+}
+
+/* ---- 答问面板 — 置于搜索框上方（搜索结果时搜索框下移） ---- */
+/* 有对话时面板在上方 */
+.home-center.has-conv .home-search-wrap {
+  flex-shrink: 0;
+}
+
+/* 面板容器 — 搜索框上方，自动撑满，内容沉底，可滚动 */
+.home-answer-panel {
+  width: 100%;
+  max-width: 620px;
+  flex: 1 1 0;
+  min-height: 120px;
+  max-height: 78vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+  margin-bottom: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 4px 16px rgba(0,0,0,0.08),
+    0 12px 36px rgba(10,25,41,0.20);
+  padding: 16px 14px 8px;
+  animation: answerExpand 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 面板内滚动条样式 */
+.home-answer-panel::-webkit-scrollbar {
+  width: 5px;
+}
+
+.home-answer-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.home-answer-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.20);
+  border-radius: 3px;
+}
+
+.home-answer-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- 聊天气泡行 ---- */
+.home-chat-row {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+/* 用户行 — 右对齐 */
+.home-chat-row.user {
+  justify-content: flex-end;
+}
+
+/* 助手行 — 左对齐 */
+.home-chat-row.assistant {
+  justify-content: flex-start;
+}
+
+/* ---- 聊天气泡 ---- */
+.home-chat-bubble {
+  max-width: 80%;
+  padding: 10px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.65;
+  word-break: break-word;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+/* 用户气泡 — 灰色半透明，右下角尖 */
+.home-chat-bubble.user {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom-right-radius: 6px;
+}
+
+/* 助手气泡 — 透明浅底，左下角尖 */
+.home-chat-bubble.assistant {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.80);
+  border-bottom-left-radius: 6px;
+}
+
+/* 同一轮内用户+助手之间的间距 */
+.home-chat-row.assistant {
+  margin-top: 2px;
+}
+
+.home-answer-loading {
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+}
+
+.home-answer-text {
+  color: rgba(255,255,255,0.80);
+}
+
+/* 打字光标 */
+.home-answer-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background: rgba(0, 91, 172, 0.70);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* 对话轮次之间的视觉分隔 */
+.home-qa-turn + .home-qa-turn {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* 面板底部 */
+/* 内容区自动推底 */
+.home-panel-inner {
+  margin-top: auto;
+}
+
+.home-panel-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 2px 4px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.home-panel-footer .home-answer-close {
+  width: auto;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.40);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.home-panel-footer .home-answer-close:hover {
+  background: rgba(255, 80, 80, 0.20);
+  color: #ff6b6b;
+}
+
+/* ---- 来源文档标签 — 独立于回答内容的气泡 ---- */
+.home-sources-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.home-source-tag {
+  padding: 3px 10px;
+  border-radius: 50px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.60);
+  font-size: 10px;
+  line-height: 1.4;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: default;
+}
+
+.home-source-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.80);
+}
+
+/* 面板展开动画 */
+@keyframes answerExpand {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ============================================================
+   Right — 环状区域预留
+   ============================================================ */
+.home-right {
+  flex: 0 0 80px;
+  /* 保持布局对称，无实际内容 */
+}
+
+/* ============================================================
+   Floating Robot Button — 白底蓝标
+   ============================================================ */
+.home-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 18px;
+  background: #fff;
+  color: #005BAC;
+  font-size: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-shadow:
+    0 8px 28px rgba(0, 91, 172, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.10);
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-fab:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 12px 36px rgba(0, 91, 172, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.home-fab:active {
+  transform: scale(0.96);
+}
+
+/* ============================================================
+   Footer — 固定在底部渐变条上方
+   ============================================================ */
+.home-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  text-align: center;
+  padding: 0 40px 18px;
+  border-top: none;
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 1100px) {
+  .home-main {
+    flex-direction: column;
+    padding: 16px 24px 12px;
+    gap: 24px;
+    min-height: auto;
+  }
+
+  .home-left {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .home-center {
+    order: -1;
+  }
+
+  .home-right {
+    display: none;
+  }
+
+  .home-nav {
+    padding: 0 20px;
+  }
+
+  .home-nav-center {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .home-main {
+    padding: 12px 16px 8px;
+  }
+
+  .home-center-title {
+    font-size: 22px;
+  }
+
+  .home-search-wrap {
+    max-width: 100%;
+  }
+
+  .home-nav {
+    padding: 0 12px;
+  }
+
+  .home-nav-logo {
+    height: 30px;
+  }
+
+  .home-nav-title {
+    font-size: 15px;
+  }
+
+  .home-nav-left {
+    gap: 8px;
+  }
+
+  .home-nav-left {
+    gap: 6px;
+  }
+
+  .home-nav-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+}

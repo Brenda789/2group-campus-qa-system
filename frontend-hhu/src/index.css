@@ -65,3 +65,11 @@ body {
   box-shadow: 0 6px 20px rgba(0, 91, 172, 0.35) !important;
   transform: translateY(-1px);
 }
+
+/* 穿透 antd Layout 默认白色背景 —— 配合全屏磨砂玻璃设计 */
+.ant-layout {
+  background: transparent !important;
+}
+.ant-layout-content {
+  background: transparent !important;
+}

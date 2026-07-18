@@ -45,10 +45,12 @@ const QUICK_QUESTIONS = [
 export interface ChatWindowHandle {
   openUpload: () => void
   openChat: () => void
+  sendQuestion: (q: string) => void
 }
 
 const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded' }>(function ChatWindow({ mode = 'floating' }, ref) {
   const { isLoggedIn } = useAuth()
+  const sendRef = useRef<((text: string) => void) | null>(null)
   const [chatOpen, setChatOpen] = useState(mode === 'embedded')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -70,7 +72,11 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
   const [renameLoading, setRenameLoading] = useState(false)
 
   // 暴露 openUpload 给父组件
-  useImperativeHandle(ref, () => ({ openUpload: () => setUploadOpen(true), openChat: () => setChatOpen(true) }), [])
+  useImperativeHandle(ref, () => ({
+    openUpload: () => setUploadOpen(true),
+    openChat: () => setChatOpen(true),
+    sendQuestion: (q: string) => { setChatOpen(true); setTimeout(() => sendRef.current?.(q), 200); },
+  }), [])
 
   const [guestConvs, setGuestConvs] = useState<Record<number, Message[]>>({})
   const [guestNextId, setGuestNextId] = useState(1)
@@ -199,6 +205,8 @@ const ChatWindow = forwardRef<ChatWindowHandle, { mode?: 'floating' | 'embedded'
       },
     )
   }
+
+  sendRef.current = send
 
   // ==================== 停止生成 ====================
   const handleStop = () => {

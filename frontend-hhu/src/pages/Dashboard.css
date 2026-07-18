@@ -1,0 +1,467 @@
+/* ============================================================
+   Dashboard — 磨砂玻璃 + 便当盒布局
+   颜色：河海蓝 #005BAC + 低饱和橙 #d97746
+   ============================================================ */
+
+/* ============================================================
+   Page header — 用户头像 + 标题
+   ============================================================ */
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.dash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dash-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.dash-subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  margin: 2px 0 0;
+}
+
+/* ============================================================
+   Bento Grid — 便当盒卡片布局
+   ============================================================ */
+.dash-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1100px) {
+  .dash-bento-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .dash-bento-grid { grid-template-columns: 1fr; }
+}
+
+/* 便当盒卡片 — 软白/低灰蓝/白底交替 */
+.dash-bento-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 18px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 第1张 — #EBF1F5 */
+.dash-bento-card:nth-child(1) {
+  background: rgba(235, 241, 245, 0.85);
+  border-color: rgba(173, 192, 207, 0.35);
+}
+/* 第2张 — #ADC0CF */
+.dash-bento-card:nth-child(2) {
+  background: rgba(173, 192, 207, 0.78);
+  border-color: rgba(173, 192, 207, 0.45);
+}
+/* 第3张 — white */
+.dash-bento-card:nth-child(3) {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(173, 192, 207, 0.30);
+}
+/* 第4张 — #EBF1F5（循环） */
+.dash-bento-card:nth-child(4) {
+  background: rgba(235, 241, 245, 0.85);
+  border-color: rgba(173, 192, 207, 0.35);
+}
+
+.dash-bento-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 8px 28px rgba(10, 25, 41, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* 图标 */
+.dash-bento-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+/* 数值 + 标签 */
+.dash-bento-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dash-bento-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.dash-bento-label {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* 箭头 */
+.dash-bento-arrow {
+  font-size: 14px;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.dash-bento-card:hover .dash-bento-arrow {
+  transform: translateX(3px);
+  color: #005BAC;
+}
+
+/* ============================================================
+   Second Row — 面板
+   ============================================================ */
+.dash-row-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .dash-row-2 { grid-template-columns: 1fr; }
+}
+
+/* 面板 — 实底淡色 */
+.dash-panel {
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(173, 192, 207, 0.30);
+  box-shadow: 0 2px 12px rgba(10, 25, 41, 0.05);
+}
+
+.dash-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dash-dot.blue   { background: #005BAC; }
+.dash-dot.orange { background: #d97746; }
+
+/* ---- 快捷操作 ---- */
+.dash-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+  outline: none;
+}
+
+.dash-action-btn:hover {
+  background: rgba(0, 91, 172, 0.06);
+  border-color: rgba(0, 91, 172, 0.18);
+  color: #005BAC;
+  transform: translateX(4px);
+}
+
+.dash-action-btn.orange:hover {
+  background: rgba(217, 119, 70, 0.06);
+  border-color: rgba(217, 119, 70, 0.18);
+  color: #d97746;
+}
+
+.dash-action-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(0, 91, 172, 0.08);
+  color: #005BAC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dash-action-btn.orange .dash-action-icon {
+  background: rgba(217, 119, 70, 0.08);
+  color: #d97746;
+}
+
+/* ---- 最近记录 ---- */
+.dash-recent-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  font-size: 13px;
+  color: #475569;
+}
+
+.dash-recent-item:last-child {
+  border-bottom: none;
+}
+
+.dash-recent-dot {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  border-radius: 50%;
+  background: #005BAC;
+}
+
+.dash-recent-dot.orange {
+  background: #d97746;
+}
+
+.dash-recent-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-recent-time {
+  font-size: 11px;
+  color: #cbd5e1;
+  flex-shrink: 0;
+}
+
+/* ---- 空状态 ---- */
+.dash-empty {
+  text-align: center;
+  color: #cbd5e1;
+  padding: 24px 0;
+  font-size: 13px;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes bentoIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dash-bento-card:nth-child(1) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.dash-bento-card:nth-child(2) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+.dash-bento-card:nth-child(3) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.19s both; }
+.dash-bento-card:nth-child(4) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both; }
+
+.dash-row-2 { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.33s both; }
+
+/* ============================================================
+   Chart Cards Grid
+   ============================================================ */
+.dash-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1100px) {
+  .dash-chart-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .dash-chart-grid { grid-template-columns: 1fr; }
+}
+
+.dash-chart-card {
+  padding: 14px 14px 10px;
+  border-radius: 16px;
+  background: rgba(235, 241, 245, 0.85);
+  border: 1px solid rgba(173, 192, 207, 0.30);
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease;
+}
+
+.dash-chart-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(10, 25, 41, 0.10);
+  border-color: rgba(173, 192, 207, 0.50);
+}
+
+/* 薄荷绿选中卡片 — 实色不透明 */
+.dash-chart-card.mint {
+  background: linear-gradient(135deg, #14b8a6, #2dd4bf);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.dash-chart-card.mint:hover {
+  border-color: rgba(255,255,255,0.50);
+  box-shadow: 0 8px 28px rgba(45, 212, 191, 0.30);
+}
+
+.dash-chart-card.mint .dash-chart-title {
+  color: #fff;
+}
+
+.dash-chart-card.mint .dash-chart-title .dash-chart-dot {
+  background: rgba(255,255,255,0.9);
+}
+
+.dash-chart-card.mint .dash-chart-footer {
+  color: rgba(255,255,255,0.65);
+}
+
+.dash-chart-card.mint .dash-chart-footer:hover {
+  color: #fff;
+}
+
+.dash-chart-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.dash-chart-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+}
+
+.dash-chart-body {
+  display: flex;
+  justify-content: center;
+  min-height: 220px;
+  align-items: center;
+}
+
+.dash-chart-svg {
+  display: block;
+}
+
+.dash-chart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.20);
+  font-size: 11px;
+  color: rgba(148,163,184,0.8);
+  transition: color 0.2s;
+}
+
+.dash-chart-card:hover .dash-chart-footer {
+  color: #005BAC;
+}
+
+/* ============================================================
+   Chart Modal — 深色玻璃
+   ============================================================ */
+.dash-chart-modal-mask {
+  background: rgba(10, 25, 41, 0.50) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Modal 白底 + 黑色文字 */
+.dash-chart-modal .ant-modal-content {
+  background: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+}
+
+.dash-chart-modal .ant-modal-header {
+  background: #fff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.dash-chart-modal .ant-modal-title {
+  color: #1e293b !important;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.dash-chart-modal .ant-modal-body {
+  background: #fff !important;
+}
+
+.dash-chart-modal .ant-modal-footer {
+  background: #fff !important;
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+.dash-chart-modal .ant-modal-close {
+  color: #94a3b8 !important;
+}
+
+.dash-chart-modal .ant-modal-close:hover {
+  color: #1e293b !important;
+}
+
+/* Animation sequence update */
+.dash-chart-card:nth-child(1) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+.dash-chart-card:nth-child(2) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.19s both; }
+.dash-chart-card:nth-child(3) { animation: bentoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both; }

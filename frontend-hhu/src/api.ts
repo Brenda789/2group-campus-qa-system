@@ -124,6 +124,7 @@ export const chatApi = {
     onToken: (text: string) => void,
     onDone: (fullAnswer: string, conversationId?: number) => void,
     onError: (err: string) => void,
+    onSources?: (sources: string[]) => void,
   ) => {
     const controller = new AbortController()
     const token = localStorage.getItem('token')
@@ -167,6 +168,12 @@ export const chatApi = {
             if (convIdStr && convIdStr !== 'new') {
               resolvedConvId = Number(convIdStr)
             }
+            continue
+          }
+
+          // 来源文档标记
+          if (data.startsWith('__SRC__')) {
+            try { onSources?.(JSON.parse(data.slice(7))) } catch { /* */ }
             continue
           }
 
@@ -229,6 +236,28 @@ export const adminApi = {
   stats: () => request.get('/admin/stats').catch(() => {
     console.warn(`${MOCK_PREFIX} admin stats fallback`)
     return { userCount: 0, documentCount: 0, qaCount: 0, todayQaCount: 0 }
+  }),
+
+  /** 图表数据 → { dailyQa, docStatus, weeklyTrend } */
+  chartStats: () => request.get('/admin/chart-stats').catch(() => {
+    console.warn(`${MOCK_PREFIX} chartStats fallback`)
+    return {
+      dailyQa: [
+        { date: '07/13', count: 3 }, { date: '07/14', count: 5 },
+        { date: '07/15', count: 2 }, { date: '07/16', count: 8 },
+        { date: '07/17', count: 4 }, { date: '07/18', count: 6 },
+        { date: '07/19', count: 1 },
+      ],
+      docStatus: [
+        { name: '就绪', value: 12 }, { name: '处理中', value: 3 }, { name: '异常', value: 1 },
+      ],
+      weeklyTrend: [
+        { date: '07/13', count: 8 }, { date: '07/14', count: 12 },
+        { date: '07/15', count: 6 }, { date: '07/16', count: 15 },
+        { date: '07/17', count: 10 }, { date: '07/18', count: 18 },
+        { date: '07/19', count: 5 },
+      ],
+    }
   }),
 
   /** 全量问答记录分页 → Page<QaRecord>，支持关键字搜索 */

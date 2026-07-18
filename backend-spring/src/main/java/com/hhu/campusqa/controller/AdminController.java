@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 管理后台专用接口（统计、全量问答记录、索引重建）
@@ -149,6 +149,61 @@ public class AdminController {
         String title = body.get("title");
         qaService.renameConversation(id, userId, title);
         return Result.success();
+    }
+
+    /** 仪表盘图表数据（近7天每日问答数、文档状态分布、每日问答趋势） */
+    @GetMapping("/chart-stats")
+    public Result<Map<String, Object>> chartStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Map<String, Object> data = new HashMap<>();
+
+        // 1. 近7天每日问答数
+        List<Map<String, Object>> dailyQa = new ArrayList<>();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM/dd");
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = LocalDate.now().minusDays(i);
+            LocalDateTime start = LocalDateTime.of(day, LocalTime.MIN);
+            LocalDateTime end = LocalDateTime.of(day, LocalTime.MAX);
+            long count = qaService.lambdaQuery()
+                    .eq(QaRecord::getUserId, userId)
+                    .ge(QaRecord::getCreateTime, start)
+                    .le(QaRecord::getCreateTime, end)
+                    .count();
+            dailyQa.add(Map.of("date", day.format(fmt), "count", count));
+        }
+        data.put("dailyQa", dailyQa);
+
+        // 2. 文档状态分布
+        long readyDocs = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getUploadedBy, userId)
+                .eq(KbDocument::getStatus, "READY").count();
+        long processingDocs = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getUploadedBy, userId)
+                .eq(KbDocument::getStatus, "PROCESSING").count();
+        long errorDocs = kbDocumentService.lambdaQuery()
+                .eq(KbDocument::getUploadedBy, userId)
+                .eq(KbDocument::getStatus, "ERROR").count();
+        data.put("docStatus", List.of(
+                Map.of("name", "就绪", "value", readyDocs),
+                Map.of("name", "处理中", "value", processingDocs),
+                Map.of("name", "异常", "value", errorDocs)
+        ));
+
+        // 3. 近7天每日新增问答数（按用户维度）
+        List<Map<String, Object>> weeklyTrend = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = LocalDate.now().minusDays(i);
+            LocalDateTime start = LocalDateTime.of(day, LocalTime.MIN);
+            LocalDateTime end = LocalDateTime.of(day, LocalTime.MAX);
+            long count = qaService.lambdaQuery()
+                    .ge(QaRecord::getCreateTime, start)
+                    .le(QaRecord::getCreateTime, end)
+                    .count();
+            weeklyTrend.add(Map.of("date", day.format(fmt), "count", count));
+        }
+        data.put("weeklyTrend", weeklyTrend);
+
+        return Result.success(data);
     }
 
     /** 重建向量索引（处理所有待处理文档） */
